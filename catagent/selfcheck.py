@@ -96,8 +96,9 @@ async def check_agent() -> None:
         report(False, "Agent starts and logs in", str(e))
         return
 
-    report(result is not None and not result.is_error, "Agent starts and logs in",
-           f"via {init.get('apiKeySource', '?')}")
+    failed = result is None or result.is_error
+    detail = "; ".join(result.errors or []) if result is not None and result.is_error else ""
+    report(not failed, "Agent starts and logs in", detail or f"via {init.get('apiKeySource', '?')}")
     report(init.get("model") == providers.model(), "Model", init.get("model", "?"))
     available = set(init.get("tools", []))
     for name in BUILTIN_TOOLS:
@@ -106,7 +107,9 @@ async def check_agent() -> None:
         report(f"mcp__cat__{name}" in available, f"Cat tool: {name}")
     extra = sorted(t for t in available if t not in BUILTIN_TOOLS and not t.startswith("mcp__cat__"))
     report(not extra or None, "No unexpected tools", ", ".join(extra))
-    report("meow" in reply.lower(), "Answers sensibly", reply.strip()[:40])
+    answered = "meow" in reply.lower()
+    # Show the whole reply when something went wrong: it usually carries the provider's error message.
+    report(answered, "Answers sensibly", reply.strip()[:40] if answered else " ".join(reply.split())[:500])
     if not config.COSTS_MONEY:
         print("     (free model: no charge)")
     elif result is not None and result.total_cost_usd is not None:
