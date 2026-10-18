@@ -6,7 +6,7 @@ import sys
 from PySide6.QtCore import QPoint, QRect, QTimer
 from PySide6.QtWidgets import QApplication
 
-from . import activity, config, context
+from . import activity, config, context, providers
 from .agent import AgentBridge
 from .cat_widget import BADGE_SPACE, CatWidget
 from .command_bar import CommandBar
@@ -260,6 +260,7 @@ class CatApp:
 
 
 def main() -> int:
+    providers.env()  # pick the model and check the key now, rather than on the first request
     app = QApplication(sys.argv)
     app.setApplicationName(config.CAT_NAME)
     app.setQuitOnLastWindowClosed(False)

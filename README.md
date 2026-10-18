@@ -5,10 +5,11 @@
 Ginger is a small ginger-and-white pixel cat that lives on your Mac desktop. You can drag
 the cat anywhere. Click it and an input bar pops up underneath it. Tell it what to do, and
 when it's finished it tells you what it did in a pixel speech cloud, such as **Code
-changed ✓** or **Text changed ✓**. The agent behind it is Claude, running through the
-[Claude Agent SDK](https://code.claude.com/docs/en/agent-sdk), which is the same engine as
-Claude Code. That means it can read and edit code, run commands, search your files and the
-web, and it also gets a few cat-specific tools:
+changed ✓** or **Text changed ✓**. The agent runs on the
+[Claude Agent SDK](https://code.claude.com/docs/en/agent-sdk), the same engine as Claude Code,
+and by default its brain is a **free AI model through [OpenRouter](https://openrouter.ai)**.
+You can switch to Claude itself, or to a model running in Ollama. It can read and edit
+code, run commands and search your files, and it also gets a few cat-specific tools:
 
 | Tool | What it does |
 |---|---|
@@ -30,12 +31,17 @@ python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
 
-export ANTHROPIC_API_KEY=sk-ant-...   # from https://platform.claude.com
+export OPENROUTER_API_KEY=sk-or-...   # free, from https://openrouter.ai (Keys)
 python run.py
 ```
 
 The Agent SDK ships with its own copy of the Claude Code engine, so nothing else needs
 installing. To avoid exporting the key every time, add the `export` line to `~/.zshrc`.
+
+On startup the cat picks the best free OpenRouter model that can use tools and tells you
+which one it chose. To pick one yourself, set `CAT_MODEL`, for example
+`CAT_MODEL=openai/gpt-oss-120b:free`. The free models change from time to time, and the
+self-check lists the ones available right now.
 
 Then check everything is set up:
 
@@ -113,7 +119,8 @@ Don't take the cat's word for it. Three commands check it for you.
 
 **1. The self-check** confirms the setup: Python and packages, that the agent can log in, the
 model, every tool the cat should have (and nothing unexpected), and on a Mac whether it can
-see your apps, take screenshots and use the clipboard. It costs one tiny model call.
+see your apps, take screenshots and use the clipboard. It makes one tiny model call (free
+with a free model).
 
 ```bash
 python -m catagent.selfcheck
@@ -140,7 +147,7 @@ permission question answered "Allow". Then each result is graded like a code rev
 - **Tests added:** for the feature task, it wrote tests for the new code
 
 ```bash
-python -m evals.run                    # all tasks (a few cents on Haiku)
+python -m evals.run                    # all tasks (free with a free model, a few cents on Haiku)
 python -m evals.run grades_crash       # just one
 python -m evals.run --keep             # keep the folders so you can read what it changed
 ```
@@ -208,16 +215,36 @@ Things to know:
   asking** in the right-click menu. Even then, other commands still ask. If you use that
   mode, keep your projects in git so you can always see and undo what changed.
 
-### What it costs
+### Choosing the AI, and what it costs
 
-The cat uses your Anthropic API key, which is pay-as-you-go: you buy credits and each request
-uses a little. On the default Haiku model, an everyday request such as a LeetCode problem
-costs a fraction of a cent. To make sure you can never be surprised, set a monthly spending
-limit in the Claude Console, and leave watch mode off, since it's the only feature that
-spends money without you asking.
+`CAT_PROVIDER` chooses the cat's brain:
 
-The cost the self-check and the exam print is the Agent SDK's own estimate. If it says
-"rough estimate", the SDK doesn't know the model's price yet and the figure is too high. Your
+| `CAT_PROVIDER` | Key | Cost | Notes |
+|---|---|---|---|
+| `openrouter` (default) | `OPENROUTER_API_KEY` | Free with `:free` models | Daily limits; weaker than Claude |
+| `anthropic` | `ANTHROPIC_API_KEY` | Pay as you go (Haiku: fractions of a cent per request) | Strongest at coding (21/21 on the exam) |
+| `ollama` | none | Free | Runs a model on your Mac (needs a lot of memory) or in Ollama's cloud |
+
+Things to know about OpenRouter's free models:
+
+- **Daily limits.** Free models allow a limited number of requests per minute and per day, and
+  the cat makes one request for every step it takes. A coding task can take 10–30 steps, so
+  you get roughly a handful to a few dozen tasks a day. OpenRouter's site has the current
+  limits. If you hit one, wait or switch model.
+- **Privacy.** Some free models are run by providers that may store or train on what you
+  send. If OpenRouter says "No endpoints found matching your data policy", allow free
+  models in its privacy settings, and don't send the cat anything secret.
+- **Quality.** Free models are less reliable than Claude at multi-step work like editing
+  the right file or running tests. Check them with the coding exam (`python -m evals.run`),
+  which is free to run with a free model.
+- **No web search.** Web search only works with Claude's own servers, so the cat leaves it
+  out with other providers. It can still fetch web pages.
+- With OpenRouter or Ollama, the cat's engine uses its own settings folder
+  (`~/.ginger/engine`), so it never reads or sends your personal Claude login.
+
+With Claude, set a monthly spending limit in the Claude Console so you can't be surprised,
+and leave watch mode off, since it's the only feature that makes requests without you
+asking. The cost the self-check and the exam print is the Agent SDK's own estimate; your
 real bill is in the Claude Console.
 
 ## Making it yours
@@ -225,9 +252,10 @@ real bill is in the Claude Console.
 All the settings are in [`catagent/config.py`](catagent/config.py):
 
 - `CAT_NAME`, `PERSONALITY`: who the cat is and how it talks
-- `MODEL`: which Claude model it uses. The default is Claude Haiku 5.5, the cheapest, which
-  scores 21/21 on the coding exam. For big, messy jobs, set `CAT_MODEL=claude-sonnet-5-5` or
-  `claude-opus-5-5`, which are smarter but cost more.
+- `PROVIDER` and `MODEL`: which AI powers it (see "Choosing the AI" above). With
+  `CAT_PROVIDER=anthropic` the default is Claude Haiku 5.5, the cheapest, which scores
+  21/21 on the coding exam; `claude-sonnet-5-5` and `claude-opus-5-5` are smarter but cost
+  more.
 - `WORKSPACE`: the folder it starts in (point it at your code folder)
 - `SCALE`: how big the cat is
 - `SLEEP_AFTER_SEC`: how long before it naps
@@ -250,6 +278,7 @@ catagent/
   agent.py        the Claude Agent SDK session, on a background asyncio thread
   activity.py     what counts as coding, and the "Code changed" style labels
   tools.py        the cat's own tools (screen, context, tips, clipboard, memory)
+  providers.py    which AI it talks to: OpenRouter, Ollama or Claude
   selfcheck.py    `python -m catagent.selfcheck`: is everything set up?
 evals/
   run.py          `python -m evals.run`: the coding exam

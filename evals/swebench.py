@@ -49,6 +49,7 @@ from claude_agent_sdk import (
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from catagent import config, context  # noqa: E402
+from catagent import providers  # noqa: E402
 from catagent.agent import build_options  # noqa: E402
 
 DEFAULT_DATASET = "SWE-bench/SWE-bench_Verified"
@@ -73,6 +74,10 @@ container where the project is installed, and it always sees your latest edits.
 
 Your change will be checked with tests you can't see, so don't change the existing tests, \
 and remove any scratch files you create. When you're done, reply with a short summary."""
+
+
+def money(dollars: float) -> str:
+    return f"${dollars:.2f}" if config.COSTS_MONEY else "free"
 
 
 def docker(*args: str, input: bytes | None = None, timeout: float | None = None) -> subprocess.CompletedProcess:
@@ -190,7 +195,8 @@ async def solve(instance: dict, folder: Path, budget: float, minutes: int) -> di
         options = build_options(context.ContextWatcher(), lambda *a: None, lambda *a: None, allow, cwd=str(folder))
         options.mcp_servers["swe"] = create_sdk_mcp_server("swe", tools=[run_in_project_env])
         options.allowed_tools.append(ENV_TOOL)
-        options.max_budget_usd = budget
+        if config.COSTS_MONEY:  # free models report made-up costs, which would trip the cap
+            options.max_budget_usd = budget
 
         prompt = PROMPT.format(repo=instance["repo"], problem_statement=instance["problem_statement"])
 
@@ -298,7 +304,7 @@ def main() -> int:
 
     # Use a throwaway memory so the benchmark neither reads nor changes the real one.
     config.MEMORY_FILE = Path(tempfile.mkdtemp(prefix="cat-swebench-memory-")) / "memory.md"
-    model_name = f"{config.CAT_NAME.lower()}-cat-{config.MODEL}"
+    model_name = f"{config.CAT_NAME.lower()}-cat-{providers.model()}".replace("/", "_").replace(":", "_")
     predictions_path = run_dir / "predictions.jsonl"
     done = set()
     if predictions_path.exists():
@@ -320,7 +326,7 @@ def main() -> int:
             f.write(json.dumps({"instance_id": iid, "model_name_or_path": model_name, "model_patch": record["patch"]}) + "\n")
         changed = len(re.findall(r"^diff --git", record["patch"], re.MULTILINE))
         status = f"error: {record['error']}" if record["error"] else f"changed {changed} file(s)"
-        print(f"    {status}; {record['seconds']}s, ${record['cost']:.2f}, {len(record['tool_calls'])} tool calls")
+        print(f"    {status}; {record['seconds']}s, {money(record['cost'])}, {len(record['tool_calls'])} tool calls")
 
     if args.no_grade:
         print(f"\nPatches saved to {predictions_path}")
@@ -334,9 +340,9 @@ def main() -> int:
         costs[iid] = json.loads(trajectory.read_text())["cost"] if trajectory.exists() else 0.0
     print(f"\n{config.CAT_NAME} on {args.dataset} ({run_id})")
     for iid in ids:
-        print(f"  {'✅' if iid in resolved else '❌'} {iid}  (${costs[iid]:.2f})")
+        print(f"  {'✅' if iid in resolved else '❌'} {iid}  ({money(costs[iid])})")
     share = 100 * len(resolved) / len(ids)
-    print(f"\nResolved {len(resolved)}/{len(ids)} ({share:.0f}%), model cost ${sum(costs.values()):.2f}")
+    print(f"\nResolved {len(resolved)}/{len(ids)} ({share:.0f}%), model cost {money(sum(costs.values()))}")
     if len(ids) < 50:
         print("A small sample gives a rough number: rerun with a bigger --sample (or --all) for a precise one.")
     return 0

@@ -26,11 +26,13 @@ from claude_agent_sdk import (
 )
 from PySide6.QtCore import QObject, Signal
 
-from . import activity, config, context, memory, tools
+from . import activity, config, context, memory, providers, tools
 
 # The built-in tools the cat gets, pinned so it has the same toolbox on every machine
 # (selfcheck.py verifies them). Its own tools come on top, from tools.py.
 BUILTIN_TOOLS = ["Read", "Glob", "Grep", "Edit", "Write", "NotebookEdit", "Bash", "WebSearch", "WebFetch"]
+if config.PROVIDER != "anthropic":
+    BUILTIN_TOOLS.remove("WebSearch")  # web search runs on Anthropic's servers, so other models can't use it
 
 # What the cat may do without asking: reading, searching, and commands that only run tests
 # or look at git history. Everything else (edits, other commands) goes through can_use_tool,
@@ -72,13 +74,14 @@ def build_options(
     if known:
         prompt += f"\nWhat you remember about {config.USER_NAME}:\n{known}\n"
     options = ClaudeAgentOptions(
-        model=config.MODEL,
+        model=providers.model(),
         cwd=cwd or str(config.WORKSPACE),
         system_prompt={"type": "preset", "preset": "claude_code", "append": prompt},
         tools=BUILTIN_TOOLS,
         mcp_servers={tools.SERVER_NAME: server},
         allowed_tools=SAFE_TOOLS + [f"Bash({c}:*)" for c in SAFE_COMMANDS] + cat_tools,
         can_use_tool=can_use_tool,
+        env=providers.env(),
     )
     if watch:
         options.disallowed_tools = ["Edit", "Write", "NotebookEdit", "Bash"]

@@ -8,9 +8,21 @@ from pathlib import Path
 CAT_NAME = os.environ.get("CAT_NAME", "Ginger")
 USER_NAME = os.environ.get("CAT_USER_NAME", getpass.getuser())
 
-# Which Claude model powers it. Haiku is the cheapest and handles everyday coding well;
-# for big, messy jobs try CAT_MODEL=claude-sonnet-5-5 or claude-opus-5-5 (smarter, pricier).
-MODEL = os.environ.get("CAT_MODEL", "claude-haiku-5-5")
+# Which AI powers the cat:
+#   "openrouter"  free cloud models through OpenRouter, with an OPENROUTER_API_KEY (the default)
+#   "ollama"      a model through the Ollama app, on your Mac or in Ollama's cloud
+#   "anthropic"   Claude, through an ANTHROPIC_API_KEY (pay as you go)
+PROVIDER = os.environ.get("CAT_PROVIDER", "openrouter").lower()
+if PROVIDER not in ("openrouter", "ollama", "anthropic"):
+    raise SystemExit(f"CAT_PROVIDER must be 'openrouter', 'ollama' or 'anthropic', not {PROVIDER!r}")
+OPENROUTER_URL = os.environ.get("CAT_OPENROUTER_URL", "https://openrouter.ai/api")
+OLLAMA_URL = os.environ.get("CAT_OLLAMA_URL", "http://localhost:11434")
+
+# Which model. Leave CAT_MODEL unset with OpenRouter and the cat picks the best free model
+# that can use tools (see providers.py); set it to choose, e.g. CAT_MODEL=openai/gpt-oss-120b:free.
+DEFAULT_MODELS = {"openrouter": "", "ollama": "gpt-oss:20b", "anthropic": "claude-haiku-5-5"}
+MODEL = os.environ.get("CAT_MODEL", DEFAULT_MODELS[PROVIDER])
+COSTS_MONEY = PROVIDER == "anthropic"
 
 # Where the cat keeps its memory and state.
 HOME_DIR = Path(os.environ.get("CAT_HOME", Path.home() / ".ginger"))

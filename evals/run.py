@@ -12,7 +12,7 @@ then grades it like a code reviewer would:
   - Tidy:          no stray files or debug prints left behind
   - Tests added:   (feature tasks only) it wrote tests for the new code
 
-Every task is a real model run, so the whole exam costs roughly a dollar or two.
+Every task is a real model run: free with a free model, a few cents on Claude Haiku.
 """
 
 import argparse
@@ -40,6 +40,7 @@ from claude_agent_sdk import (
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from catagent import config, context  # noqa: E402
+from catagent import providers  # noqa: E402
 from catagent.agent import build_options  # noqa: E402
 
 TASKS = Path(__file__).parent / "tasks"
@@ -56,6 +57,10 @@ class Run:
     cost: float = 0.0
     seconds: float = 0.0
     error: str = ""
+
+
+def money(dollars: float) -> str:
+    return f"${dollars:.2f}" if config.COSTS_MONEY else "free"
 
 
 def git(folder: Path, *args: str) -> str:
@@ -207,7 +212,7 @@ async def take_task(task_dir: Path, keep: bool) -> tuple[int, int, float]:
     for ok, text in checks:
         print(f"   {'✅' if ok else '❌'} {text}")
     print(f"   🐱 {run.reply[:300]}")
-    print(f"   ⏱  {run.seconds:.0f}s, ${run.cost:.2f}, {len(run.tool_calls)} tool calls, {len(run.asked)} permission questions")
+    print(f"   ⏱  {run.seconds:.0f}s, {money(run.cost)}, {len(run.tool_calls)} tool calls, {len(run.asked)} permission questions")
     if keep:
         (folder / "exam_log.txt").write_text(log + f"\n\nReply:\n{run.reply}\n")
         print(f"   📁 {folder}  (exam_log.txt lists every tool call)")
@@ -228,14 +233,14 @@ async def main() -> int:
     task_dirs = sorted(d for d in TASKS.iterdir() if (d / "task.json").exists())
     if args.tasks:
         task_dirs = [d for d in task_dirs if d.name in args.tasks]
-    print(f"{config.CAT_NAME}'s coding exam: {len(task_dirs)} tasks, model {config.MODEL}")
+    print(f"{config.CAT_NAME}'s coding exam: {len(task_dirs)} tasks, model {providers.model()}")
 
     passed = total = 0
     cost = 0.0
     for task_dir in task_dirs:
         p, t, c = await take_task(task_dir, args.keep)
         passed, total, cost = passed + p, total + t, cost + c
-    print(f"\nScore: {passed}/{total} checks passed, total cost ${cost:.2f}")
+    print(f"\nScore: {passed}/{total} checks passed, total cost {money(cost)}")
     return 0 if passed == total else 1
 
 

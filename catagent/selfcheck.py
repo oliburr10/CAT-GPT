@@ -2,18 +2,20 @@
 
 It checks Python and packages, then starts the agent exactly as the app does and confirms
 the model, the login and every tool, and finally (on a Mac) the permissions the cat needs.
-The live part costs one tiny model call.
+The live part is one tiny model call (free with OpenRouter's free models or Ollama).
 """
 
 import asyncio
 import importlib.metadata
+import json
 import os
 import shutil
 import sys
+import urllib.request
 
 from claude_agent_sdk import AssistantMessage, ClaudeSDKClient, ResultMessage, SystemMessage, TextBlock
 
-from . import config, context
+from . import config, context, providers
 from .agent import BUILTIN_TOOLS, build_options
 
 OK, BAD, WARN = "✅", "❌", "⚠️ "
@@ -38,8 +40,37 @@ def check_install() -> None:
             report(True, package, importlib.metadata.version(package))
         except importlib.metadata.PackageNotFoundError:
             report(False, package, "not installed: pip install -r requirements.txt")
-    has_key = bool(os.environ.get("ANTHROPIC_API_KEY"))
-    report(True if has_key else None, "ANTHROPIC_API_KEY", "set" if has_key else "not set; the live check shows whether another login works")
+
+
+
+def check_provider() -> None:
+    print(f"AI provider: {config.PROVIDER}")
+    if config.PROVIDER == "anthropic":
+        has_key = bool(os.environ.get("ANTHROPIC_API_KEY"))
+        report(True if has_key else None, "ANTHROPIC_API_KEY", "set" if has_key else "not set; the live check shows whether another login works")
+    elif config.PROVIDER == "openrouter":
+        report(bool(os.environ.get("OPENROUTER_API_KEY")), "OPENROUTER_API_KEY",
+               "set" if os.environ.get("OPENROUTER_API_KEY") else "not set: create one at openrouter.ai under Keys")
+        try:
+            free = providers.free_tool_models()
+        except OSError as e:
+            report(False, "Can reach OpenRouter", str(e))
+            return
+        report(bool(free), "Free models that can use tools", f"{len(free)}, e.g. {', '.join(m['id'] for m in free[:3])}")
+        chosen = providers.model()
+        report(chosen in {m["id"] for m in free} or None, "Chosen model is free and can use tools", chosen)
+    else:
+        try:
+            with urllib.request.urlopen(f"{config.OLLAMA_URL}/api/version", timeout=5) as r:
+                version = json.load(r)["version"]
+            parts = tuple(int(x) for x in version.split(".")[:2] if x.isdigit())
+            report(parts >= (0, 14), "Ollama is running (needs 0.14 or newer)", version)
+            with urllib.request.urlopen(f"{config.OLLAMA_URL}/api/tags", timeout=5) as r:
+                names = {m["name"] for m in json.load(r)["models"]}
+            report(config.MODEL in names or f"{config.MODEL}:latest" in names, f"Model {config.MODEL} is downloaded",
+                   "" if config.MODEL in names or f"{config.MODEL}:latest" in names else f"run: ollama pull {config.MODEL}")
+        except OSError as e:
+            report(False, "Ollama is running", f"{e}; open the Ollama app")
 
 
 async def check_agent() -> None:
@@ -67,7 +98,7 @@ async def check_agent() -> None:
 
     report(result is not None and not result.is_error, "Agent starts and logs in",
            f"via {init.get('apiKeySource', '?')}")
-    report(init.get("model") == config.MODEL, "Model", init.get("model", "?"))
+    report(init.get("model") == providers.model(), "Model", init.get("model", "?"))
     available = set(init.get("tools", []))
     for name in BUILTIN_TOOLS:
         report(name in available, f"Tool: {name}")
@@ -76,7 +107,9 @@ async def check_agent() -> None:
     extra = sorted(t for t in available if t not in BUILTIN_TOOLS and not t.startswith("mcp__cat__"))
     report(not extra or None, "No unexpected tools", ", ".join(extra))
     report("meow" in reply.lower(), "Answers sensibly", reply.strip()[:40])
-    if result is not None and result.total_cost_usd is not None:
+    if not config.COSTS_MONEY:
+        print("     (free model: no charge)")
+    elif result is not None and result.total_cost_usd is not None:
         usage = next(iter((result.model_usage or {}).values()), None)
         guessed = getattr(usage, "costBasis", None) == "unknown" or (isinstance(usage, dict) and usage.get("costBasis") == "unknown")
         note = "; a rough estimate, since this SDK version doesn't know the model's price yet" if guessed else ""
@@ -104,6 +137,10 @@ def check_mac() -> None:
 def main() -> int:
     print(f"{config.CAT_NAME} self-check\n")
     check_install()
+    check_provider()
+    if failures:
+        print("\nFix the problems above first, then run the self-check again.")
+        return 1
     asyncio.run(check_agent())
     check_mac()
     print("\n" + ("All good! 🐾" if not failures else f"{failures} problem(s) found."))
