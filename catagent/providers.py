@@ -6,6 +6,7 @@ switching is just a matter of pointing the engine somewhere else.
 
 import json
 import os
+import urllib.error
 import urllib.request
 
 from . import config
@@ -13,6 +14,8 @@ from . import config
 # When no model is chosen, the cat picks a free OpenRouter model that can use tools,
 # preferring the ones that are strongest at coding (first match wins).
 FREE_PREFERENCE = ["gpt-oss-120b", "deepseek", "kimi-k2", "glm", "qwen3-coder", "llama-3.3-70b", "gpt-oss-20b"]
+MAX_TRIES = 8  # how many free models to try before giving up
+CHOSEN_MODEL_FILE = config.HOME_DIR / "openrouter_model.txt"  # remembers the pick between runs
 
 
 def free_tool_models() -> list[dict]:
@@ -33,16 +36,66 @@ def free_tool_models() -> list[dict]:
     return sorted(usable, key=rank)
 
 
-def model() -> str:
-    """The model the cat uses, picking a free OpenRouter one the first time if none was chosen."""
-    if not config.MODEL and config.PROVIDER == "openrouter":
+def try_model(model_id: str) -> str | None:
+    """Send a model a one-word message. Returns None if it answers, otherwise why it didn't.
+
+    Some free models only work for particular apps, or are overloaded, even though OpenRouter
+    lists them as available, so the only reliable test is to ask.
+    """
+    request = urllib.request.Request(
+        f"{config.OPENROUTER_URL}/v1/messages",
+        data=json.dumps({"model": model_id, "max_tokens": 16,
+                         "messages": [{"role": "user", "content": "Say hi."}]}).encode(),
+        headers={"Authorization": f"Bearer {os.environ.get('OPENROUTER_API_KEY', '')}",
+                 "anthropic-version": "2023-06-01", "content-type": "application/json"},
+        method="POST",
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=90):
+            return None
+    except urllib.error.HTTPError as e:
         try:
-            choices = free_tool_models()
-        except OSError as e:
-            raise SystemExit(f"Couldn't reach OpenRouter to pick a free model ({e}). Set CAT_MODEL to choose one.")
-        if not choices:
-            raise SystemExit("OpenRouter has no free models with tool calling right now. Set CAT_MODEL to choose one.")
-        config.MODEL = choices[0]["id"]
+            message = json.load(e)["error"]["message"]
+        except (ValueError, KeyError, TypeError):
+            message = e.reason
+        return f"{e.code} {message}"
+    except OSError as e:
+        return str(e)
+
+
+def pick_free_model() -> str:
+    """Try OpenRouter's free tool-using models, best first, and return the first that answers."""
+    try:
+        candidates = free_tool_models()
+    except OSError as e:
+        raise SystemExit(f"Couldn't reach OpenRouter to pick a free model ({e}). Set CAT_MODEL to choose one.")
+    for candidate in candidates[:MAX_TRIES]:
+        problem = try_model(candidate["id"])
+        if problem is None:
+            return candidate["id"]
+        print(f"  (skipping {candidate['id']}: {problem[:150]})")
+    raise SystemExit("None of OpenRouter's free models answered. Wait a while and try again, "
+                     "or set CAT_MODEL to choose one.")
+
+
+def forget_model() -> None:
+    """Forget the remembered free model, so the next start picks again."""
+    CHOSEN_MODEL_FILE.unlink(missing_ok=True)
+    if config.PROVIDER == "openrouter" and not os.environ.get("CAT_MODEL"):
+        config.MODEL = ""
+
+
+def model() -> str:
+    """The model the cat uses. With OpenRouter and no CAT_MODEL, a free one that really answers."""
+    if not config.MODEL and config.PROVIDER == "openrouter":
+        remembered = CHOSEN_MODEL_FILE.read_text().strip() if CHOSEN_MODEL_FILE.exists() else ""
+        if remembered:
+            config.MODEL = remembered
+        else:
+            print(f"Finding a free model that works (this takes a few seconds the first time)...")
+            config.MODEL = pick_free_model()
+            config.HOME_DIR.mkdir(parents=True, exist_ok=True)
+            CHOSEN_MODEL_FILE.write_text(config.MODEL)
         print(f"{config.CAT_NAME} is using the free model {config.MODEL} (set CAT_MODEL to choose another).")
     return config.MODEL
 

@@ -38,8 +38,10 @@ python run.py
 The Agent SDK ships with its own copy of the Claude Code engine, so nothing else needs
 installing. To avoid exporting the key every time, add the `export` line to `~/.zshrc`.
 
-On startup the cat picks the best free OpenRouter model that can use tools and tells you
-which one it chose. To pick one yourself, set `CAT_MODEL`, for example
+The first time it starts, the cat picks a free OpenRouter model that can use tools. Some
+free models only work for particular apps, so it sends each candidate a tiny test message,
+keeps the first one that answers, tells you which one it chose and remembers it. If that
+model stops working later, run the self-check, which picks again. To pick one yourself, set `CAT_MODEL`, for example
 `CAT_MODEL=openai/gpt-oss-120b:free`. The free models change from time to time, and the
 self-check lists the ones available right now.
 

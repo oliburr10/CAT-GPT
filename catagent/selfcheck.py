@@ -57,8 +57,16 @@ def check_provider() -> None:
             report(False, "Can reach OpenRouter", str(e))
             return
         report(bool(free), "Free models that can use tools", f"{len(free)}, e.g. {', '.join(m['id'] for m in free[:3])}")
-        chosen = providers.model()
-        report(chosen in {m["id"] for m in free} or None, "Chosen model is free and can use tools", chosen)
+        if not os.environ.get("OPENROUTER_API_KEY"):
+            return
+        providers.forget_model()  # pick afresh, in case the remembered model stopped working
+        try:
+            chosen = providers.model()
+        except SystemExit as e:
+            report(False, "Found a free model that answers", str(e))
+            return
+        problem = providers.try_model(chosen)
+        report(problem is None, "Chosen model answers", chosen + (f": {problem}" if problem else ""))
     else:
         try:
             with urllib.request.urlopen(f"{config.OLLAMA_URL}/api/version", timeout=5) as r:
