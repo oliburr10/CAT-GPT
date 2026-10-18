@@ -1,4 +1,4 @@
-# Ginger: a pixel cat that is your personal agent
+# CAT-GPT: Ginger, a pixel cat that is your personal agent
 
 ![Ginger waking up, taking an instruction and saying what it did](docs/cat_flow.gif)
 
@@ -24,7 +24,8 @@ web, and it also gets a few cat-specific tools:
 You need Python 3.10 or newer.
 
 ```bash
-cd cat_agent
+git clone https://github.com/oliburr10/CAT-GPT.git
+cd CAT-GPT
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
@@ -268,6 +269,6 @@ thread, and the two communicate through Qt signals.
 - A global hotkey to summon the cat
 - Calendar, Reminders and Notes tools (via AppleScript or Shortcuts)
 - Google Docs editing through the Google Docs API
-- Voice: a wake word plus speech-to-text (the speech enhancement work in this repo could
-  clean up the audio first)
+- Voice: a wake word plus speech-to-text (an intention-based speech enhancement
+  model could clean up the audio first)
 - Launch at login (a LaunchAgent or a packaged `.app` via `py2app`)
