@@ -18,6 +18,19 @@ PALETTE = {
     "N": "#5b6570",  # laptop edge
     "M": "#a9b2bc",  # laptop lid
     "H": "#e8edf2",  # laptop logo
+    # Costumes (costumes.py)
+    "R": "#4caf50",  # dragon green
+    "r": "#2e7d32",  # dragon green, shadow
+    "U": "#f3f0a6",  # dragon belly
+    "u": "#d9d27e",  # dragon belly, shadow
+    "A": "#f6e9c3",  # dragon horns
+    "a": "#d8c38c",  # dragon horns, shadow
+    "Z": "#ff8a3d",  # dragon crest and tail spade
+    "Y": "#ffd23f",  # gold stars and sparkles
+    "B": "#26222e",  # wizard hat
+    "b": "#3d3749",  # wizard hat, shading
+    "V": "#7a52d6",  # wizard hat band
+    "k": "#1d1d1f",  # wand
 }
 
 # Sitting cat, facing forward, tail curled on the right.
@@ -163,8 +176,11 @@ HEIGHT = len(BASE)
 
 
 def render(frame: str, scale: int) -> QPixmap:
-    grid = FRAMES[frame]
-    pm = QPixmap(WIDTH * scale, HEIGHT * scale)
+    return render_grid(FRAMES[frame], scale)
+
+
+def render_grid(grid: list[str], scale: int) -> QPixmap:
+    pm = QPixmap(WIDTH * scale, len(grid) * scale)
     pm.fill(Qt.GlobalColor.transparent)
     p = QPainter(pm)
     for y, row in enumerate(grid):

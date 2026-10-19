@@ -56,6 +56,7 @@ class CatApp:
         self.cat.auto_edit_toggled.connect(self.set_auto_edit)
         self.cat.stop_requested.connect(self.agent.stop_turn)
         self.cat.quit_requested.connect(self.quit)
+        self.cat.costume_changed.connect(self.on_costume_changed)
 
         self.bar.submitted.connect(self.send)
         self.panel.visibility_changed.connect(self.cat.set_panel_open)
@@ -86,6 +87,7 @@ class CatApp:
         self.watcher.start()
         self.agent.start()
         state = self._load_state()
+        self.cat.set_costume(state.get("costume", "ginger"), animate=False)  # before placing: it sets the size
         screen = self.app.primaryScreen().availableGeometry()
         default = QPoint(screen.right() - self.cat.width() - 40, screen.bottom() - self.cat.height() - 120)
         pos = QPoint(*state["pos"]) if "pos" in state else default
@@ -143,6 +145,11 @@ class CatApp:
         text = "<context>\n" + "\n".join(notes) + "\n</context>\n\n" + text
         self._turn_tip = None
         self.agent.send(text)
+
+    def on_costume_changed(self, costume: str) -> None:
+        if self.cat.isVisible():  # at startup the saved costume is put back before the cat is placed
+            self.follow_cat()
+            self._save_state(costume=costume)
 
     def new_conversation(self) -> None:
         self.agent.new_conversation()

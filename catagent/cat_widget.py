@@ -9,7 +9,7 @@ from PySide6.QtCore import QPoint, QRectF, Qt, QTimer, Signal
 from PySide6.QtGui import QAction, QColor, QFont, QPainter, QPainterPath, QPen
 from PySide6.QtWidgets import QMenu, QWidget
 
-from . import config, sprites
+from . import config, costumes, sprites
 
 CODE_BADGES = ["</>", "{ }", "( )", "</>", ";"]
 BADGE_SPACE = 26   # room above the cat for the "...", "!" and "</>" badges
@@ -44,6 +44,7 @@ class CatWidget(QWidget):
     quit_requested = Signal()
     stop_requested = Signal()
     notepad_requested = Signal()
+    costume_changed = Signal(str)
     moved = Signal()
 
     def __init__(self):
@@ -53,10 +54,9 @@ class CatWidget(QWidget):
         self.setCursor(Qt.CursorShape.OpenHandCursor)
         self.setMouseTracking(True)  # to show a pointing hand over the arrow
 
-        self._pixmaps = {name: sprites.render(name, config.SCALE) for name in sprites.FRAMES}
-        sprite_w, sprite_h = sprites.WIDTH * config.SCALE, sprites.HEIGHT * config.SCALE
-        self.setFixedSize(sprite_w + BADGE_SPACE, sprite_h + BADGE_SPACE + ARROW_SPACE)
-        self._sprite_h = sprite_h
+        self._sprite_h = sprites.HEIGHT * config.SCALE
+        self._costume = ""
+        self._load_costume("ginger")
 
         self._frame = "idle"
         self._frame_until = 0.0
@@ -110,6 +110,37 @@ class CatWidget(QWidget):
         """The arrow points down to open the panel and up once it's open."""
         self._panel_open = open_
         self.update()
+
+    @property
+    def costume(self) -> str:
+        return self._costume
+
+    def set_costume(self, costume: str, animate: bool = True) -> None:
+        """Put on a costume, watching the cat dress up in it unless animate is False."""
+        if costume not in costumes.COSTUMES:
+            costume = "ginger"
+        if costume != self._costume:
+            self._load_costume(costume)
+            self.costume_changed.emit(costume)
+        if animate:
+            # Start on the first step now, so the finished costume doesn't flash up first.
+            self._sequence = list(costumes.DRESS_UP[costume])
+            self._frame, seconds = self._sequence.pop(0)
+            self._sequence_until = time.monotonic() + seconds
+            self._after_sequence = None
+        self.poke()
+
+    def _load_costume(self, costume: str) -> None:
+        """Render the costume's frames and resize to fit its hat or horns, keeping the feet in place."""
+        self._costume = costume
+        self._pixmaps = {name: costumes.render(costume, name, config.SCALE) for name in costumes.COSTUMES[costume]}
+        self._headroom = (costumes.height(costume) - sprites.HEIGHT) * config.SCALE
+        bottom = self.y() + self.height()
+        self.setFixedSize(sprites.WIDTH * config.SCALE + BADGE_SPACE,
+                          BADGE_SPACE + self._headroom + self._sprite_h + ARROW_SPACE)
+        if self.isVisible():
+            self.move(self.x(), bottom - self.height())
+            self.moved.emit()
 
     def poke(self) -> None:
         """Something happened: wake up."""
@@ -181,7 +212,7 @@ class CatWidget(QWidget):
 
     def _arrow_rect(self) -> QRectF:
         x = HEAD_X * config.SCALE - ARROW_W / 2
-        y = BADGE_SPACE + self._sprite_h + (ARROW_SPACE - ARROW_H) / 2
+        y = BADGE_SPACE + self._headroom + self._sprite_h + (ARROW_SPACE - ARROW_H) / 2
         return QRectF(x, y, ARROW_W, ARROW_H)
 
     def _draw_arrow(self, p: QPainter) -> None:
@@ -213,7 +244,7 @@ class CatWidget(QWidget):
         """Pixel z's that float up from the sleeping cat's head, growing and fading as they go."""
         now = time.monotonic()
         start_x = 7 * config.SCALE
-        start_y = BADGE_SPACE + 8 * config.SCALE
+        start_y = BADGE_SPACE + self._headroom + 8 * config.SCALE
         for i in range(Z_COUNT):
             t = (now / Z_RISE_SEC + i / Z_COUNT) % 1.0
             size = 4 + round(t * 2)  # 4x4 pixels growing to 6x6
@@ -303,6 +334,11 @@ class CatWidget(QWidget):
         stop.setEnabled(self._busy)
         menu.addAction("Look at my screen", self.look_requested.emit)
         menu.addAction("Open Notepad", self.notepad_requested.emit)
+        wardrobe = menu.addMenu("Costume")
+        for costume, name in costumes.NAMES.items():
+            action = QAction(name, wardrobe, checkable=True, checked=costume == self._costume)
+            action.triggered.connect(lambda checked=False, c=costume: self.set_costume(c))
+            wardrobe.addAction(action)
         watch = QAction("Watch mode (pop up tips)", menu, checkable=True, checked=self._watching)
         watch.toggled.connect(self.watch_toggled.emit)
         menu.addAction(watch)

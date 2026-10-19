@@ -95,8 +95,20 @@ Restart the cat after you change these.
   On a Mac the panel has a real blur behind it. If that ever misbehaves, start the cat with
   `CAT_FROSTED=0` for a plain light panel. Press **Esc** or click the arrow again to close it.
 - **Right-click** the cat for these options: *Talk to Ginger*, *Stop what you're doing*,
-  *Look at my screen*, *Open Notepad*, *Watch mode*, *Edit files without asking*,
+  *Look at my screen*, *Open Notepad*, *Costume*, *Watch mode*, *Edit files without asking*,
   *New conversation*, *Quit*.
+- **Costumes:** right-click the cat and pick a *Costume*, and you watch it dress up.
+  - **Green Dragon:** the green suit pulls up from its feet, then the hood with cream horns and
+    an orange crest comes down, with a sparkle. It has a pale belly, a little wing and a
+    spade-tipped tail.
+  - **Wizard:** a tall black hat with a purple band and gold stars floats down onto its head,
+    then its wand appears and sparkles (and twinkles now and then).
+  - **Ginger:** back to plain, in a puff of sparkles.
+
+  Every costume has every pose: napping, coding with glasses, the wake-up stretch. The cat
+  remembers its costume. The pixel art is in [`catagent/costumes.py`](catagent/costumes.py).
+
+  ![Ginger dressing up as a dragon](docs/cat_dragon.gif) ![Ginger dressing up as a wizard](docs/cat_wizard.gif)
 - Each instruction automatically includes the app or file you were in just before clicking
   the cat, so "fix this" just works.
 - The cat's moods: `...` means it's thinking, and a red `!` means it has a tip for you.
@@ -353,12 +365,13 @@ catagent/
   context.py      macOS helpers: frontmost app, browser tab, Word doc, screenshots
   memory.py       long-term memory file
   sprites.py      the pixel art
+  costumes.py     the Green Dragon and Wizard costumes, and their dressing-up animations
   config.py       settings and personality
 evals/
   run.py          `python -m evals.run`: the coding exam
   tasks/          one folder per exam task: task.json, project/, hidden_tests/
   swebench.py     `python -m evals.swebench`: the cat on SWE-bench, graded by the official harness
-tests/            `python -m pytest tests`: the clipboard, connections, the notes checks and the .tex export
+tests/            `python -m pytest tests`: the clipboard, connections, costumes, the notes checks and the .tex export
 ```
 
 Qt runs the UI on the main thread. The agent runs on its own asyncio loop in a background
