@@ -28,6 +28,11 @@ COSTS_MONEY = PROVIDER == "anthropic"
 HOME_DIR = Path(os.environ.get("CAT_HOME", Path.home() / ".ginger"))
 MEMORY_FILE = HOME_DIR / "memory.md"
 STATE_FILE = HOME_DIR / "state.json"
+NOTEPAD_FILE = HOME_DIR / "notepad.json"
+
+# Where the Notepad's clipboard keeps your projects, folders and clipped notes, as real files
+# you can also open in Finder: ~/Ginger/Math 1/Week 1/Questions/...
+NOTES_DIR = Path(os.environ.get("CAT_NOTES_DIR", Path.home() / "Ginger")).expanduser()
 
 # The folder the agent starts in. It can still open files elsewhere when you point it at them.
 WORKSPACE = Path(os.environ.get("CAT_WORKSPACE", Path.home())).expanduser()

@@ -1,4 +1,4 @@
-"""Wires the cat, its input bar, its speech cloud and the agent together."""
+"""Wires the cat, its input bar, its speech cloud, the Notepad and the agent together."""
 
 import json
 import sys
@@ -10,6 +10,9 @@ from . import activity, config, context, providers
 from .agent import AgentBridge
 from .cat_widget import BADGE_SPACE, CatWidget
 from .command_bar import CommandBar
+
+# Imported before the QApplication exists, as Qt WebEngine (which the Notepad uses) needs.
+from .notepad import Notepad
 from .speech_cloud import SpeechCloud
 
 HEAD_X = 8  # the cat's head is centred about this many sprite pixels from its left edge
@@ -38,12 +41,15 @@ class CatApp:
         self._permissions: list[tuple[str, str, str]] = []        # questions waiting for an answer
         self._hidden_for_capture: list = []
         self._watched_context = None
+        self._notepad: Notepad | None = None                      # made the first time it's needed
+        self._turn_from_notepad = False
 
         self.cat.keep_awake = lambda: self.bar.isVisible() or self.cloud.isVisible()
         self.cat.clicked.connect(self.toggle_bar)
         self.cat.moved.connect(self.follow_cat)
         self.cat.look_requested.connect(self.look_at_screen)
-        self.cat.new_conversation_requested.connect(self.agent.new_conversation)
+        self.cat.new_conversation_requested.connect(self.new_conversation)
+        self.cat.notepad_requested.connect(lambda: self.notepad().open())
         self.cat.watch_toggled.connect(self.set_watch_mode)
         self.cat.auto_edit_toggled.connect(self.set_auto_edit)
         self.cat.stop_requested.connect(self.agent.stop_turn)
@@ -57,7 +63,8 @@ class CatApp:
         self.agent.busy_changed.connect(self.on_busy)
         self.agent.coding.connect(lambda: self.cat.set_coding(True))
         self.agent.finished.connect(self.on_finished)
-        self.agent.failed.connect(lambda error: self.say("Oops!", error))
+        self.agent.failed.connect(self.on_failed)
+        self.agent.notes_ready.connect(lambda notes: self.notepad().show_notes(notes))
         self.agent.permission_requested.connect(self.on_permission)
         self.agent.tip.connect(self.on_tip)
         self.agent.hide_requested.connect(self.set_hidden_for_capture)
@@ -94,10 +101,11 @@ class CatApp:
         self.follow_cat()
         self.bar.open()
 
-    def send(self, text: str) -> None:
+    def send(self, text: str, *, from_notepad: bool = False) -> None:
+        self._turn_from_notepad = from_notepad
         notes = []
         ctx = self.watcher.last()
-        self.cat.set_coding(activity.looks_like_coding(text, ctx.app if ctx else ""))
+        self.cat.set_coding(not from_notepad and activity.looks_like_coding(text, ctx.app if ctx else ""))
         if ctx is not None:
             notes.append(ctx.describe())
         if self._last_tip:
@@ -108,11 +116,26 @@ class CatApp:
         self._turn_tip = None
         self.agent.send(text)
 
+    def new_conversation(self) -> None:
+        self.agent.new_conversation()
+        if self._notepad is not None:
+            self._notepad.forget_conversation()
+
+    def notepad(self) -> Notepad:
+        if self._notepad is None:
+            self._notepad = Notepad()
+            self._notepad.asked.connect(lambda text: self.send(text, from_notepad=True))
+            self._notepad.stop_requested.connect(self.agent.stop_turn)
+            self._notepad.set_busy(self.agent.busy)
+        return self._notepad
+
     def look_at_screen(self) -> None:
         self.send("Take a look at my screen. What am I working on, and is there anything I should fix?")
 
     def on_busy(self, busy: bool) -> None:
         self.cat.set_busy(busy)
+        if self._notepad is not None:
+            self._notepad.set_busy(busy)
         if busy:
             self.cloud.hide()
         else:
@@ -128,7 +151,14 @@ class CatApp:
             reply = reply or tip_message
         if not title and not reply:
             title = "Done! ✓"
+        if self._turn_from_notepad and self._notepad is not None:
+            self._notepad.set_reply(reply or title)
         self.say(title, reply, file_path=file_path, line=line)
+
+    def on_failed(self, error: str) -> None:
+        if self._turn_from_notepad and self._notepad is not None:
+            self._notepad.set_error(error)
+        self.say("Oops!", error)
 
     def say(self, title: str, body: str = "", *, file_path: str = "", line: int = 0) -> None:
         self._cloud_file = (file_path, line)
@@ -254,6 +284,8 @@ class CatApp:
 
     def quit(self) -> None:
         self._save_state()
+        if self._notepad is not None:
+            self._notepad.close()  # saves what's open
         self.watcher.stop()
         self.agent.shutdown()
         self.app.quit()

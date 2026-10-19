@@ -58,4 +58,5 @@ def action_label(name: str, args: dict) -> str | None:
         "copy_to_clipboard": "Copied to clipboard",
         "remember": "Noted",
         "open_in_editor": "Opened it for you",
+        "write_study_notes": "Notes written",
     }.get(short)

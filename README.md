@@ -78,7 +78,8 @@ Restart the cat after you change these.
   change train.py?"), shows the change, and waits for **Allow** or **Don't**. Reading,
   searching and browsing happen without asking.
 - **Right-click** the cat for these options: *Talk to Ginger*, *Stop what you're doing*,
-  *Look at my screen*, *Watch mode*, *Edit files without asking*, *New conversation*, *Quit*.
+  *Look at my screen*, *Open Notepad*, *Watch mode*, *Edit files without asking*,
+  *New conversation*, *Quit*.
 - Each instruction automatically includes the app or file you were in just before clicking
   the cat, so "fix this" just works.
 - The cat's moods: `...` means it's thinking, and a red `!` means it has a tip for you.
@@ -95,6 +96,46 @@ Restart the cat after you change these.
   glasses come off when it's done. The rules are in [`catagent/activity.py`](catagent/activity.py).
 
   ![Ginger putting on glasses to code](docs/cat_coding.gif)
+
+### The Notepad: study notes and your clipboard
+
+Ask the cat to help you understand, solve or prove something ("Prove that Trace(AB) =
+Trace(BA), I'm stuck"), from its input bar or from the Notepad, and instead of a speech cloud
+it writes **study notes** and opens them in the Notepad. Right-click the cat and choose
+*Open Notepad* to open it yourself. The notes always teach in the same order:
+
+1. **What you have**: every definition and fact you start from, as a formula, each with what
+   it means in plain words, then the goal.
+2. **Solve it step by step**: each step starts from a formula, says which facts it uses,
+   continues the same small example as a colour-coded picture (say, the entries of *A* in
+   beige, *B* in blue and the diagonal in green, matching the colours in the formulas and the
+   text), and ends with *What it means*.
+3. **Complete solution**: the whole solution in one box, step by step, with the key idea and
+   a mistake to watch out for.
+
+There are no quizzes. Ask about any step in the chat box at the bottom ("explain step 3
+again") and the cat answers there or rewrites the notes. **Export .tex** saves them as a
+LaTeX file that compiles with pdflatex or in Overleaf.
+
+The **Clipboard** panel on the right (the *Clipboard* button shows and hides it; opening it
+widens the window, so it never covers your notes) is where you keep what you've learned:
+
+- **+ Folder** and **+ Subfolder** build your own structure, e.g. *Week 1 › Questions*, *Exams*,
+  *Projects*. **+ Note** saves a study note or a project idea into the selected folder.
+- Pick a folder and press **Clip here** (or **Clip solution** on the complete-solution box)
+  to file the open notes there, with **Undo**. Pick another folder and **Move here** to move them.
+- Click any clip to open it again. **Search clips** finds anything by name.
+- The project menu at the top left switches between projects (like *Math 1*) or makes a new one.
+
+Everything is saved as real files in `~/Ginger/<project>/...` (one `.json` file per clip),
+so you can also browse, back up or sync them in Finder. The folder button in the panel opens
+it. To try the Notepad without asking the cat anything, run `python -m catagent.notepad`,
+which opens it on an example.
+
+How good the notes are depends on the model. The cat checks every set of notes before
+showing them (missing sections, maths outside `$...$`, colours without a meaning in the key)
+and sends them back to the model with a list of what to fix. Claude Haiku passes within one or
+two tries; free models vary, so if one keeps failing, set `CAT_MODEL` to a stronger free model.
 
 ### Watch mode
 
@@ -262,6 +303,8 @@ All the settings are in [`catagent/config.py`](catagent/config.py):
 - `SCALE`: how big the cat is
 - `SLEEP_AFTER_SEC`: how long before it naps
 - `WATCH_INTERVAL_SEC`
+- `NOTES_DIR`: where the Notepad's clipboard keeps your projects (`~/Ginger`, or set
+  `CAT_NOTES_DIR`)
 
 The cat's look is defined in [`catagent/sprites.py`](catagent/sprites.py) as ASCII grids,
 one letter per pixel. Edit the letters to redraw it, or add frames.
@@ -279,17 +322,23 @@ catagent/
   speech_cloud.py the pixel speech cloud: results, tips and Allow/Don't questions
   agent.py        the Claude Agent SDK session, on a background asyncio thread
   activity.py     what counts as coding, and the "Code changed" style labels
-  tools.py        the cat's own tools (screen, context, tips, clipboard, memory)
+  tools.py        the cat's own tools (screen, context, tips, clipboard, memory, study notes)
+  notepad.py      the Notepad window and the bridge its page talks to
+  web/            the Notepad page (HTML, CSS, JS) and KaTeX for the maths
+  study.py        the study-notes format, its checks, and the .tex export
+  clipboard.py    projects, folders and clips, as files in ~/Ginger
+  examples.py     example study notes (Trace(AB) = Trace(BA))
   providers.py    which AI it talks to: OpenRouter, Ollama or Claude
   selfcheck.py    `python -m catagent.selfcheck`: is everything set up?
-evals/
-  run.py          `python -m evals.run`: the coding exam
-  tasks/          one folder per exam task: task.json, project/, hidden_tests/
-  swebench.py     `python -m evals.swebench`: the cat on SWE-bench, graded by the official harness
   context.py      macOS helpers: frontmost app, browser tab, Word doc, screenshots
   memory.py       long-term memory file
   sprites.py      the pixel art
   config.py       settings and personality
+evals/
+  run.py          `python -m evals.run`: the coding exam
+  tasks/          one folder per exam task: task.json, project/, hidden_tests/
+  swebench.py     `python -m evals.swebench`: the cat on SWE-bench, graded by the official harness
+tests/            `python -m pytest tests`: the clipboard, the notes checks and the .tex export
 ```
 
 Qt runs the UI on the main thread. The agent runs on its own asyncio loop in a background

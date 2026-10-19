@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Notepad</title>
+<link rel="stylesheet" href="katex/katex.min.css">
+<link rel="stylesheet" href="notepad.css">
+<script src="katex/katex.min.js"></script>
+<script src="katex/contrib/auto-render.min.js"></script>
+<script src="qrc:///qtwebchannel/qwebchannel.js"></script>
+</head>
+<body>
+<div class="window">
+  <header class="titlebar">
+    <div class="project-menu">
+      <button type="button" id="project-button" class="project-button" aria-haspopup="true" aria-expanded="false"></button>
+      <div id="project-popover" class="popover" hidden></div>
+    </div>
+    <span class="muted">Notepad</span>
+    <span class="pill">Study mode</span>
+    <span class="spacer"></span>
+    <button type="button" id="export" class="tool-button">Export .tex</button>
+    <button type="button" id="side-toggle" class="tool-button" aria-pressed="true">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="3"></rect><path d="M15 4v16"></path></svg>
+      Clipboard
+    </button>
+  </header>
+
+  <div class="body">
+    <div class="main">
+      <div class="scroll" id="scroll">
+        <article class="notes" id="notes"></article>
+      </div>
+      <footer class="chat">
+        <div id="reply" class="reply" hidden></div>
+        <div class="chat-bar">
+          <button type="button" id="attach" class="icon-button" aria-label="Attach an image or file of a problem">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg>
+          </button>
+          <label for="ask" class="visually-hidden">Ask Ginger</label>
+          <input id="ask" type="text" autocomplete="off" placeholder="Ask about any step, or paste the next problem…">
+          <button type="button" id="send" class="send-button" aria-label="Send">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 19V5M6 11l6-6 6 6"></path></svg>
+          </button>
+        </div>
+      </footer>
+    </div>
+
+    <aside class="side" id="side" aria-label="Clipboard">
+      <div class="side-inner" id="side-inner"></div>
+    </aside>
+  </div>
+</div>
+<script src="notepad.js"></script>
+</body>
+</html>

@@ -26,7 +26,7 @@ from claude_agent_sdk import (
 )
 from PySide6.QtCore import QObject, Signal
 
-from . import activity, config, context, memory, providers, tools
+from . import activity, config, context, memory, providers, study, tools
 
 # The built-in tools the cat gets, pinned so it has the same toolbox on every machine
 # (selfcheck.py verifies them). Its own tools come on top, from tools.py.
@@ -66,11 +66,12 @@ def build_options(
     *,
     cwd: str | None = None,
     watch: bool = False,
+    show_notes=lambda notes: None,
 ) -> ClaudeAgentOptions:
     """The cat's full agent setup. The app, the self-check and the coding exam all use this."""
-    server, cat_tools = tools.build_server(watcher, show_tip=show_tip, set_hidden=set_hidden)
+    server, cat_tools = tools.build_server(watcher, show_tip=show_tip, set_hidden=set_hidden, show_notes=show_notes)
     known = memory.load()
-    prompt = config.PERSONALITY
+    prompt = config.PERSONALITY + "\n" + study.RULES.format(user=config.USER_NAME)
     if known:
         prompt += f"\nWhat you remember about {config.USER_NAME}:\n{known}\n"
     options = ClaudeAgentOptions(
@@ -120,6 +121,7 @@ class AgentBridge(QObject):
     permission_requested = Signal(str, str, str)  # request id, question, details
     tip = Signal(str, str, str, int)              # title, message, file path, line
     hide_requested = Signal(bool)                 # hide/show the cat's windows around screenshots
+    notes_ready = Signal(object)                  # study notes for the Notepad (a dict)
 
     def __init__(self, watcher: context.ContextWatcher):
         super().__init__()
@@ -175,6 +177,7 @@ class AgentBridge(QObject):
             set_hidden=self.hide_requested.emit,
             can_use_tool=self._deny_all if watch else self._ask_user,
             watch=watch,
+            show_notes=self.notes_ready.emit,
         )
 
     async def _main(self) -> None:

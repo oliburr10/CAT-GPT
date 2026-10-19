@@ -21,6 +21,7 @@ from .agent import BUILTIN_TOOLS, build_options
 OK, BAD, WARN = "✅", "❌", "⚠️ "
 CAT_TOOLS = [
     "what_am_i_working_on", "look_at_screen", "show_tip", "open_in_editor", "copy_to_clipboard", "remember",
+    "write_study_notes",
 ]
 failures = 0
 
@@ -40,7 +41,12 @@ def check_install() -> None:
             report(True, package, importlib.metadata.version(package))
         except importlib.metadata.PackageNotFoundError:
             report(False, package, "not installed: pip install -r requirements.txt")
-
+    try:
+        # The Notepad shows its notes with it.
+        from PySide6 import QtWebEngineWidgets  # noqa: F401
+        report(True, "Qt WebEngine, for the Notepad")
+    except ImportError as e:
+        report(False, "Qt WebEngine, for the Notepad", f"{e}; reinstall with: pip install --force-reinstall PySide6")
 
 
 def check_provider() -> None:

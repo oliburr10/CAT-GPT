@@ -2,11 +2,12 @@
 
 import asyncio
 import base64
+import json
 from typing import Callable
 
 from claude_agent_sdk import create_sdk_mcp_server, tool
 
-from . import config, context, memory
+from . import config, context, memory, study
 
 SERVER_NAME = "cat"
 
@@ -18,12 +19,25 @@ def _text(msg: str, is_error: bool = False) -> dict:
     return result
 
 
+def _unpack(args: dict) -> dict:
+    """Some models send nested fields as JSON strings; turn those back into lists and objects."""
+    notes = dict(args)
+    for key in ("colors", "have", "goal", "steps", "solution"):
+        if isinstance(notes.get(key), str):
+            try:
+                notes[key] = json.loads(notes[key])
+            except ValueError:
+                pass
+    return notes
+
+
 def build_server(
     watcher: context.ContextWatcher,
     show_tip: Callable[[str, str, str, int], None],
     set_hidden: Callable[[bool], None],
+    show_notes: Callable[[dict], None] = lambda notes: None,
 ):
-    """Create the tool server. show_tip and set_hidden are thread-safe callbacks into the UI."""
+    """Create the tool server. show_tip, set_hidden and show_notes are thread-safe callbacks into the UI."""
 
     @tool(
         "what_am_i_working_on",
@@ -112,8 +126,26 @@ def build_server(
         memory.add(args["fact"])
         return _text("Remembered.")
 
+    @tool(
+        "write_study_notes",
+        "Write study notes that teach how to solve a problem and open them in the Notepad: what "
+        "you have (formulas with meanings), the solution step by step (each step a formula, an "
+        "optional colour-coded picture, and what it means), and the complete solution in one box. "
+        "Use this whenever the user wants to understand, learn, solve or prove something.",
+        study.SCHEMA,
+    )
+    async def write_study_notes(args):
+        notes = _unpack(args)
+        found = study.problems(notes)
+        if found:
+            return _text("The notes weren't shown. Fix these and call write_study_notes again:\n- "
+                         + "\n- ".join(found), is_error=True)
+        show_notes(notes)
+        return _text("The notes are open in the Notepad. Reply with one short sentence.")
+
     tools = [
         what_am_i_working_on, look_at_screen, show_tip_tool, open_in_editor, copy_to_clipboard, remember,
+        write_study_notes,
     ]
     server = create_sdk_mcp_server(SERVER_NAME, tools=tools)
     names = [f"mcp__{SERVER_NAME}__{t.name}" for t in tools]

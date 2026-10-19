@@ -39,6 +39,7 @@ class CatWidget(QWidget):
     auto_edit_toggled = Signal(bool)
     quit_requested = Signal()
     stop_requested = Signal()
+    notepad_requested = Signal()
     moved = Signal()
 
     def __init__(self):
@@ -241,6 +242,7 @@ class CatWidget(QWidget):
         stop = menu.addAction("Stop what you're doing", self.stop_requested.emit)
         stop.setEnabled(self._busy)
         menu.addAction("Look at my screen", self.look_requested.emit)
+        menu.addAction("Open Notepad", self.notepad_requested.emit)
         watch = QAction("Watch mode (pop up tips)", menu, checkable=True, checked=self._watching)
         watch.toggled.connect(self.watch_toggled.emit)
         menu.addAction(watch)
