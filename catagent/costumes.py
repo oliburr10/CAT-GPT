@@ -9,6 +9,9 @@ Each costume also has a dressing-up animation, played when you pick it: DRESS_UP
 list of (frame, seconds).
 """
 
+import random
+import re
+
 from PySide6.QtGui import QPixmap
 
 from . import sprites
@@ -288,6 +291,50 @@ for _costume, _steps in (("ginger", _ginger_steps),
     for _i, (_grid, _seconds) in enumerate(_steps):
         COSTUMES[_costume][f"dress_{_i}"] = _grid
         DRESS_UP[_costume].append((f"dress_{_i}", _seconds))
+
+
+# ---- asking for a costume in the input bar --------------------------------------------------
+
+ALIASES = {
+    "dragon": "dragon", "green dragon": "dragon", "dragon costume": "dragon",
+    "wizard": "wizard", "magician": "wizard", "wizard costume": "wizard", "magic cat": "wizard",
+    "ginger": "ginger", "normal": "ginger", "yourself": "ginger", "a cat": "ginger", "cat": "ginger",
+    "plain": "ginger", "no costume": "ginger", "regular": "ginger", "default": "ginger",
+}
+SAYS = {
+    "dragon": "Rawr! I'm a dragon now. 🐉",
+    "wizard": "Abracadabra! Wizard Ginger at your service. ✨",
+    "ginger": "Back to plain old me. 🐾",
+}
+_ALIAS = "|".join(sorted((re.escape(a) for a in ALIASES), key=len, reverse=True))
+_POLITE = r"(?:please\s+|can you\s+|could you\s+|now\s+|ginger,?\s+)*"
+_END = r"(?:\s+(?:please|now|again))*\s*[.!?]*"
+_RANDOM = re.compile(
+    rf"^{_POLITE}(?:(?:change|switch|swap|new|random|another|different)\s+(?:your\s+|the\s+|a\s+)?costumes?"
+    rf"(?:\s+(?:randomly|at random))?|random\s+costume|surprise me with a costume){_END}$")
+_INTO = re.compile(
+    rf"^{_POLITE}(?:(?:change|turn|switch|transform)\s+(?:back\s+)?(?:into|to)|dress\s+(?:up\s+)?as|"
+    rf"(?:put on|wear)(?:\s+(?:the|your|a))?|be|become|go\s+back\s+to|back\s+to)\s+(?:a\s+|an\s+|the\s+|your\s+)?"
+    rf"({_ALIAS})(?:\s+(?:costume|outfit|hat))?{_END}$")
+
+
+def parse_request(text: str) -> str | None:
+    """A costume from a short command like "change into dragon" or "change costume" (which gives
+    "random"); None if the message is about something else, so it goes to the agent."""
+    text = " ".join(text.lower().split())
+    if len(text.split()) > 10:
+        return None
+    if _RANDOM.match(text):
+        return "random"
+    match = _INTO.match(text)
+    return ALIASES[match.group(1)] if match else None
+
+
+def pick(request: str, current: str) -> str:
+    """Turn "random" into a real costume, never the one already on."""
+    if request != "random":
+        return request
+    return random.choice([c for c in COSTUMES if c != current])
 
 
 def height(costume: str) -> int:

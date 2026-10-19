@@ -7,7 +7,7 @@ from typing import Callable
 
 from claude_agent_sdk import create_sdk_mcp_server, tool
 
-from . import config, connections, context, memory, study
+from . import config, connections, context, costumes, memory, study
 
 SERVER_NAME = "cat"
 
@@ -36,8 +36,10 @@ def build_server(
     show_tip: Callable[[str, str, str, int], None],
     set_hidden: Callable[[bool], None],
     show_notes: Callable[[dict], None] = lambda notes: None,
+    set_costume: Callable[[str], None] = lambda costume: None,
 ):
-    """Create the tool server. show_tip, set_hidden and show_notes are thread-safe callbacks into the UI."""
+    """Create the tool server. The callbacks (show_tip, set_hidden, show_notes, set_costume) are
+    thread-safe calls into the UI."""
 
     @tool(
         "what_am_i_working_on",
@@ -148,9 +150,28 @@ def build_server(
         show_notes(notes)
         return _text("The notes are open in the Notepad. Reply with one short sentence.")
 
+    @tool(
+        "change_costume",
+        "Change your own costume on the desktop; the user watches you dress up. Use it when they "
+        "ask you to dress up, change costume or turn into something. 'random' picks a different one.",
+        {
+            "type": "object",
+            "properties": {"costume": {"type": "string", "enum": [*costumes.COSTUMES, "random"],
+                                       "description": "ginger is your plain self, with no costume."}},
+            "required": ["costume"],
+        },
+    )
+    async def change_costume(args):
+        costume = args.get("costume", "")
+        if costume not in costumes.COSTUMES and costume != "random":
+            return _text(f"There's no {costume!r} costume. Choose from: {', '.join(costumes.COSTUMES)} or random.",
+                         is_error=True)
+        set_costume(costume)
+        return _text("You're changing now. Reply with one short, in-character sentence.")
+
     tools = [
         what_am_i_working_on, look_at_screen, show_tip_tool, open_in_editor, copy_to_clipboard, remember,
-        write_study_notes,
+        write_study_notes, change_costume,
     ]
     server = create_sdk_mcp_server(SERVER_NAME, tools=tools)
     names = [f"mcp__{SERVER_NAME}__{t.name}" for t in tools]

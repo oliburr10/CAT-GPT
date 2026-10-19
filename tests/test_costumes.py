@@ -1,3 +1,5 @@
+import pytest
+
 from catagent import costumes, sprites
 
 
@@ -30,3 +32,29 @@ def test_dressing_up_ends_in_the_costume():
         assert all(frame in costumes.COSTUMES[name] and seconds > 0 for frame, seconds in steps)
         last = costumes.COSTUMES[name][steps[-1][0]]
         assert last == costumes.COSTUMES[name]["idle"], name
+
+
+@pytest.mark.parametrize("text, costume", [
+    ("Change costumes", "random"), ("change costume randomly", "random"), ("random costume", "random"),
+    ("please change your costume!", "random"),
+    ("change into dragon", "dragon"), ("Change into a Dragon", "dragon"), ("turn into a green dragon", "dragon"),
+    ("put on the dragon costume", "dragon"),
+    ("change into wizard", "wizard"), ("dress up as a wizard", "wizard"), ("wear the wizard hat", "wizard"),
+    ("change back to normal", "ginger"), ("back to normal", "ginger"), ("change into ginger", "ginger"),
+])
+def test_costume_commands(text, costume):
+    assert costumes.parse_request(text) == costume
+
+
+@pytest.mark.parametrize("text", [
+    "change into a unicorn", "fix the dragon class in game.py", "surprise me",
+    "change the costume of the main character in my story to a dragon please because it is cooler",
+])
+def test_other_messages_go_to_the_agent(text):
+    assert costumes.parse_request(text) is None
+
+
+def test_random_never_picks_the_costume_already_on():
+    for current in costumes.COSTUMES:
+        assert all(costumes.pick("random", current) != current for _ in range(30))
+    assert costumes.pick("wizard", "wizard") == "wizard"

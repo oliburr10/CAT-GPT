@@ -67,9 +67,11 @@ def build_options(
     cwd: str | None = None,
     watch: bool = False,
     show_notes=lambda notes: None,
+    set_costume=lambda costume: None,
 ) -> ClaudeAgentOptions:
     """The cat's full agent setup. The app, the self-check and the coding exam all use this."""
-    server, cat_tools = tools.build_server(watcher, show_tip=show_tip, set_hidden=set_hidden, show_notes=show_notes)
+    server, cat_tools = tools.build_server(watcher, show_tip=show_tip, set_hidden=set_hidden,
+                                           show_notes=show_notes, set_costume=set_costume)
     known = memory.load()
     prompt = config.PERSONALITY + "\n" + study.RULES.format(user=config.USER_NAME)
     if known:
@@ -122,6 +124,7 @@ class AgentBridge(QObject):
     tip = Signal(str, str, str, int)              # title, message, file path, line
     hide_requested = Signal(bool)                 # hide/show the cat's windows around screenshots
     notes_ready = Signal(object)                  # study notes for the Notepad (a dict)
+    costume_requested = Signal(str)               # a costume name, or "random"
 
     def __init__(self, watcher: context.ContextWatcher):
         super().__init__()
@@ -178,6 +181,7 @@ class AgentBridge(QObject):
             can_use_tool=self._deny_all if watch else self._ask_user,
             watch=watch,
             show_notes=self.notes_ready.emit,
+            set_costume=self.costume_requested.emit,
         )
 
     async def _main(self) -> None:

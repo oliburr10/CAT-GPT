@@ -6,7 +6,7 @@ import sys
 from PySide6.QtCore import QPoint, QRect, QTimer
 from PySide6.QtWidgets import QApplication
 
-from . import activity, clipboard, config, connections, context, providers
+from . import activity, clipboard, config, connections, context, costumes, providers
 from .agent import AgentBridge
 from .cat_widget import BADGE_SPACE, HEAD_X, CatWidget
 from .command_bar import CommandBar
@@ -73,6 +73,7 @@ class CatApp:
         self.agent.finished.connect(self.on_finished)
         self.agent.failed.connect(self.on_failed)
         self.agent.notes_ready.connect(lambda notes: self.notepad().show_notes(notes))
+        self.agent.costume_requested.connect(self.change_costume)
         self.agent.permission_requested.connect(self.on_permission)
         self.agent.tip.connect(self.on_tip)
         self.agent.hide_requested.connect(self.set_hidden_for_capture)
@@ -130,7 +131,22 @@ class CatApp:
         self.panel.hide()
         self.notepad().open()
 
+    def change_costume(self, request: str) -> str:
+        """Dress up: request is a costume name or "random". Returns the costume put on."""
+        costume = costumes.pick(request, self.cat.costume)
+        self.cat.set_costume(costume)
+        return costume
+
     def send(self, text: str, *, from_notepad: bool = False) -> None:
+        request = None if from_notepad else costumes.parse_request(text)
+        if request is not None:
+            # "change into dragon", "change costume": no need to ask the AI, just do it.
+            if request == self.cat.costume:
+                self.say("Already on! ✓", "That's what I'm wearing right now. 🐾")
+                return
+            costume = self.change_costume(request)
+            self.say("Costume changed ✓", costumes.SAYS[costume])
+            return
         self._turn_from_notepad = from_notepad
         project = clipboard.current_project()
         notes = [f"Mode: Study mode. Project: {project} (its notes are in {config.NOTES_DIR / project})."]

@@ -97,7 +97,14 @@ Restart the cat after you change these.
 - **Right-click** the cat for these options: *Talk to Ginger*, *Stop what you're doing*,
   *Look at my screen*, *Open Notepad*, *Costume*, *Watch mode*, *Edit files without asking*,
   *New conversation*, *Quit*.
-- **Costumes:** right-click the cat and pick a *Costume*, and you watch it dress up.
+- **Costumes:** type a costume command in the input bar, or right-click the cat and pick a
+  *Costume*, and you watch it dress up.
+  - *change costume* (or *change costumes*) picks a different costume at random.
+  - *change into dragon*, *change into wizard*, *back to normal*. Variations like *turn into a
+    green dragon*, *dress up as a wizard* or *wear the wizard hat* work too.
+
+  These short commands happen instantly and never use the AI. Anything else ("can you put on
+  something magical?") goes to Ginger, which can change its own costume too.
   - **Green Dragon:** the green suit pulls up from its feet, then the hood with cream horns and
     an orange crest comes down, with a sparkle. It has a pale belly, a little wing and a
     spade-tipped tail.

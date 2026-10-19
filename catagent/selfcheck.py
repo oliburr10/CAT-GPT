@@ -21,7 +21,7 @@ from .agent import BUILTIN_TOOLS, build_options
 OK, BAD, WARN = "✅", "❌", "⚠️ "
 CAT_TOOLS = [
     "what_am_i_working_on", "look_at_screen", "show_tip", "open_in_editor", "copy_to_clipboard", "remember",
-    "write_study_notes",
+    "write_study_notes", "change_costume",
 ]
 failures = 0
 
