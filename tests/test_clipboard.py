@@ -106,3 +106,13 @@ def test_broken_files_are_skipped(notes_dir):
     (notes_dir / "P" / "other.json").write_text('{"some": "other app"}')
     (notes_dir / "P" / ".DS_Store").write_text("")
     assert clipboard.tree("P") == []
+
+
+def test_current_project_is_shared_and_saved():
+    clipboard.make_project("Math 1")
+    clipboard.make_project("Physics")
+    assert clipboard.current_project() == "Math 1"   # the first one, until you pick
+    clipboard.set_current_project("Physics")
+    assert clipboard.current_project() == "Physics"
+    with pytest.raises(ClipboardError):
+        clipboard.set_current_project("Nope")

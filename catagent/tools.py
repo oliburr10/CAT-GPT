@@ -7,7 +7,7 @@ from typing import Callable
 
 from claude_agent_sdk import create_sdk_mcp_server, tool
 
-from . import config, context, memory, study
+from . import config, connections, context, memory, study
 
 SERVER_NAME = "cat"
 
@@ -46,10 +46,10 @@ def build_server(
         {},
     )
     async def what_am_i_working_on(args):
-        ctx = watcher.last()
-        if ctx is None:
+        where = connections.describe(watcher.last())
+        if where is None:
             return _text("Unknown: no app has been seen yet (or this isn't macOS).")
-        return _text(ctx.describe())
+        return _text(where)
 
     @tool(
         "look_at_screen",
@@ -57,6 +57,10 @@ def build_server(
         {},
     )
     async def look_at_screen(args):
+        off_limits = connections.blocked(watcher.last())
+        if off_limits:
+            return _text(f"{off_limits} is in front and isn't connected, so you may not look at the screen. "
+                         f"Ask the user to connect it in your panel (the arrow under you) first.", is_error=True)
         if config.HIDE_DURING_SCREENSHOT:
             set_hidden(True)
             await asyncio.sleep(0.4)  # give the windows time to disappear
@@ -104,7 +108,8 @@ def build_server(
         },
     )
     async def open_in_editor(args):
-        return _text(context.open_in_editor(args["file_path"], int(args.get("line", 0))))
+        return _text(context.open_in_editor(args["file_path"], int(args.get("line", 0)),
+                                            use_vscode=connections.is_connected("vscode")))
 
     @tool(
         "copy_to_clipboard",

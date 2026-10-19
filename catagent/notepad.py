@@ -139,13 +139,14 @@ class _Page(QWebEnginePage):
 class Notepad(QWidget):
     asked = Signal(str)          # a message for the cat, already wrapped with the Notepad's context
     stop_requested = Signal()
+    project_changed = Signal(str)
 
     def __init__(self):
         super().__init__()
         self.setWindowTitle(f"{config.CAT_NAME} · Notepad")
         self.setMinimumSize(860, 560)
         saved = self._load()
-        self.project = clipboard.ensure_project(saved.get("project", ""))
+        self.project = clipboard.current_project()
         self.current: dict | None = saved.get("current")          # {"id", "kind", "title", "notes" | "text"}
         self.current_path: str | None = saved.get("current_path")  # where it's clipped, if it is
         self.from_disk = saved.get("from_disk", True)              # not written in this conversation
@@ -233,11 +234,12 @@ class Notepad(QWidget):
     # ---- called by the page ------------------------------------------------------------------
 
     def set_project(self, name: str) -> None:
-        if name not in clipboard.projects():
-            raise ClipboardError(f"There's no project called {name}.")
+        """Switch project. The cat's panel shows the same project, so it hears about it too."""
+        clipboard.set_current_project(name)
         if name != self.project:
             self.project = name
             self.current_path = None
+            self.project_changed.emit(name)
         self.refresh()
 
     def clip_current(self, folder: str) -> None:
@@ -340,7 +342,7 @@ class Notepad(QWidget):
     def _save(self) -> None:
         config.HOME_DIR.mkdir(parents=True, exist_ok=True)
         config.NOTEPAD_FILE.write_text(json.dumps({
-            "project": self.project, "current": self.current, "current_path": self.current_path,
+            "current": self.current, "current_path": self.current_path,
             "from_disk": True, "side_open": self.side_open, "size": [self.width(), self.height()],
         }, ensure_ascii=False), encoding="utf-8")
 

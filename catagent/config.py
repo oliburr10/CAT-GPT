@@ -48,6 +48,9 @@ WATCH_INTERVAL_SEC = 120
 # Hide the cat and its bubbles while taking a screenshot so they don't cover what you're working on.
 HIDE_DURING_SCREENSHOT = True
 
+# The panel under the cat gets a real macOS blur behind it. Set CAT_FROSTED=0 for a plain one.
+FROSTED = os.environ.get("CAT_FROSTED", "1") != "0"
+
 PERSONALITY = f"""\
 You are {CAT_NAME}, a small ginger-and-white pixel cat who lives on {USER_NAME}'s MacBook \
 desktop and is their personal assistant.

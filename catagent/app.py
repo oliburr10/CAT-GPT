@@ -1,4 +1,4 @@
-"""Wires the cat, its input bar, its speech cloud, the Notepad and the agent together."""
+"""Wires the cat, its input bar, its panel, its speech cloud, the Notepad and the agent together."""
 
 import json
 import sys
@@ -6,16 +6,16 @@ import sys
 from PySide6.QtCore import QPoint, QRect, QTimer
 from PySide6.QtWidgets import QApplication
 
-from . import activity, config, context, providers
+from . import activity, clipboard, config, connections, context, providers
 from .agent import AgentBridge
-from .cat_widget import BADGE_SPACE, CatWidget
+from .cat_widget import BADGE_SPACE, HEAD_X, CatWidget
 from .command_bar import CommandBar
 
 # Imported before the QApplication exists, as Qt WebEngine (which the Notepad uses) needs.
 from .notepad import Notepad
+from .panel import MARGIN as PANEL_MARGIN
+from .panel import Panel
 from .speech_cloud import SpeechCloud
-
-HEAD_X = 8  # the cat's head is centred about this many sprite pixels from its left edge
 
 
 def _hide_dock_icon() -> None:
@@ -34,6 +34,7 @@ class CatApp:
         self.agent = AgentBridge(self.watcher)
         self.cat = CatWidget()
         self.bar = CommandBar()
+        self.panel = Panel()
         self.cloud = SpeechCloud()
         self._last_tip = ""
         self._turn_tip: tuple[str, str, str, int] | None = None  # a tip shown while working
@@ -44,8 +45,9 @@ class CatApp:
         self._notepad: Notepad | None = None                      # made the first time it's needed
         self._turn_from_notepad = False
 
-        self.cat.keep_awake = lambda: self.bar.isVisible() or self.cloud.isVisible()
+        self.cat.keep_awake = lambda: self.bar.isVisible() or self.cloud.isVisible() or self.panel.isVisible()
         self.cat.clicked.connect(self.toggle_bar)
+        self.cat.arrow_clicked.connect(self.toggle_panel)
         self.cat.moved.connect(self.follow_cat)
         self.cat.look_requested.connect(self.look_at_screen)
         self.cat.new_conversation_requested.connect(self.new_conversation)
@@ -56,8 +58,13 @@ class CatApp:
         self.cat.quit_requested.connect(self.quit)
 
         self.bar.submitted.connect(self.send)
+        self.panel.visibility_changed.connect(self.cat.set_panel_open)
+        self.panel.resized.connect(self.follow_cat)
+        self.panel.project_changed.connect(self.on_project_changed)
+        self.panel.notepad_requested.connect(self.open_notepad_from_panel)
         self.cloud.answered.connect(self.on_permission_answer)
-        self.cloud.show_me.connect(lambda: context.open_in_editor(*self._cloud_file))
+        self.cloud.show_me.connect(lambda: context.open_in_editor(
+            *self._cloud_file, use_vscode=connections.is_connected("vscode")))
         self.cloud.closed.connect(lambda: self.cat.set_alert(False))
 
         self.agent.busy_changed.connect(self.on_busy)
@@ -95,24 +102,45 @@ class CatApp:
         if self.bar.isVisible():
             self.bar.hide()
             return
+        self.panel.hide()
         self.cat.set_alert(False)
         if not self._permissions:
             self.cloud.hide()
         self.follow_cat()
         self.bar.open()
 
+    def toggle_panel(self) -> None:
+        """The arrow under the cat: mode, project, connections and the Notepad."""
+        if self.panel.isVisible():
+            self.panel.hide()
+            return
+        self.bar.hide()
+        if not self._permissions:
+            self.cloud.hide()
+        self.panel.open()
+        self.follow_cat()
+
+    def on_project_changed(self, name: str) -> None:
+        if self._notepad is not None and self._notepad.project != name:
+            self._notepad.set_project(name)
+
+    def open_notepad_from_panel(self) -> None:
+        self.panel.hide()
+        self.notepad().open()
+
     def send(self, text: str, *, from_notepad: bool = False) -> None:
         self._turn_from_notepad = from_notepad
-        notes = []
+        project = clipboard.current_project()
+        notes = [f"Mode: Study mode. Project: {project} (its notes are in {config.NOTES_DIR / project})."]
         ctx = self.watcher.last()
         self.cat.set_coding(not from_notepad and activity.looks_like_coding(text, ctx.app if ctx else ""))
-        if ctx is not None:
-            notes.append(ctx.describe())
+        where = connections.describe(ctx)
+        if where is not None:
+            notes.append(where)
         if self._last_tip:
             notes.append(f"Tip you popped up earlier: {self._last_tip}")
             self._last_tip = ""
-        if notes:
-            text = "<context>\n" + "\n".join(notes) + "\n</context>\n\n" + text
+        text = "<context>\n" + "\n".join(notes) + "\n</context>\n\n" + text
         self._turn_tip = None
         self.agent.send(text)
 
@@ -126,6 +154,7 @@ class CatApp:
             self._notepad = Notepad()
             self._notepad.asked.connect(lambda text: self.send(text, from_notepad=True))
             self._notepad.stop_requested.connect(self.agent.stop_turn)
+            self._notepad.project_changed.connect(lambda name: self.panel.isVisible() and self.panel.refresh())
             self._notepad.set_busy(self.agent.busy)
         return self._notepad
 
@@ -203,7 +232,7 @@ class CatApp:
 
     def set_hidden_for_capture(self, hidden: bool) -> None:
         if hidden:
-            self._hidden_for_capture = [w for w in (self.cat, self.bar, self.cloud) if w.isVisible()]
+            self._hidden_for_capture = [w for w in (self.cat, self.bar, self.panel, self.cloud) if w.isVisible()]
             for w in self._hidden_for_capture:
                 w.hide()
         else:
@@ -235,6 +264,8 @@ class CatApp:
         ctx = self.watcher.last()
         if ctx is None or ctx == self._watched_context or self.bar.isVisible():
             return
+        if connections.blocked(ctx):
+            return  # not connected: no peeking
         if self.watcher.seconds_since_change() < 20:
             return
         self._watched_context = ctx
@@ -243,7 +274,7 @@ class CatApp:
     # ---- layout ------------------------------------------------------------------------------
 
     def follow_cat(self) -> None:
-        """Keep the input bar just under the cat and the speech cloud just above its head."""
+        """Keep the input bar and panel just under the cat and the speech cloud just above its head."""
         cat = self.cat.frameGeometry()
         screen = self.app.screenAt(cat.center()) or self.app.primaryScreen()
         area = screen.availableGeometry()
@@ -254,6 +285,14 @@ class CatApp:
         if y + bar.height() > area.bottom():
             y = cat.top() + BADGE_SPACE - bar.height()  # no room below: put it above instead
         self.bar.move(self._clamp(QRect(QPoint(head_x - bar.width() // 2, y), bar), area))
+
+        # The panel's window has see-through margins for its shadow, so line up the card itself.
+        panel = self.panel.size()
+        y = cat.bottom() + 2 - PANEL_MARGIN
+        if y + panel.height() - PANEL_MARGIN > area.bottom():
+            y = cat.top() + BADGE_SPACE - panel.height() + PANEL_MARGIN  # no room below: above instead
+        card_area = area.adjusted(-PANEL_MARGIN, -PANEL_MARGIN, PANEL_MARGIN, PANEL_MARGIN)
+        self.panel.move(self._clamp(QRect(QPoint(head_x - panel.width() // 2, y), panel), card_area))
 
         cloud = self.cloud.size()
         y = cat.top() + BADGE_SPACE + 2 * config.SCALE - cloud.height()

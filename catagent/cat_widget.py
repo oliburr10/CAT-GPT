@@ -5,7 +5,7 @@ import random
 import time
 from typing import Callable
 
-from PySide6.QtCore import QPoint, Qt, QTimer, Signal
+from PySide6.QtCore import QPoint, QRectF, Qt, QTimer, Signal
 from PySide6.QtGui import QAction, QColor, QFont, QPainter, QPainterPath, QPen
 from PySide6.QtWidgets import QMenu, QWidget
 
@@ -13,6 +13,9 @@ from . import config, sprites
 
 CODE_BADGES = ["</>", "{ }", "( )", "</>", ";"]
 BADGE_SPACE = 26   # room above the cat for the "...", "!" and "</>" badges
+ARROW_SPACE = 34   # room below the cat for the arrow that opens its panel
+ARROW_W, ARROW_H = 44, 26
+HEAD_X = 8         # the cat's head is centred about this many sprite pixels from its left edge
 BREATH_SEC = 2.6   # one slow breath while asleep
 Z_RISE_SEC = 3.0   # how long each floating z takes to drift up and fade away
 Z_COUNT = 3
@@ -33,6 +36,7 @@ def floating_window_flags() -> Qt.WindowType:
 
 class CatWidget(QWidget):
     clicked = Signal()
+    arrow_clicked = Signal()
     look_requested = Signal()
     new_conversation_requested = Signal()
     watch_toggled = Signal(bool)
@@ -47,10 +51,12 @@ class CatWidget(QWidget):
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
         self.setAttribute(Qt.WidgetAttribute.WA_MacAlwaysShowToolWindow)
         self.setCursor(Qt.CursorShape.OpenHandCursor)
+        self.setMouseTracking(True)  # to show a pointing hand over the arrow
 
         self._pixmaps = {name: sprites.render(name, config.SCALE) for name in sprites.FRAMES}
         sprite_w, sprite_h = sprites.WIDTH * config.SCALE, sprites.HEIGHT * config.SCALE
-        self.setFixedSize(sprite_w + BADGE_SPACE, sprite_h + BADGE_SPACE)
+        self.setFixedSize(sprite_w + BADGE_SPACE, sprite_h + BADGE_SPACE + ARROW_SPACE)
+        self._sprite_h = sprite_h
 
         self._frame = "idle"
         self._frame_until = 0.0
@@ -63,6 +69,9 @@ class CatWidget(QWidget):
         self._last_attention = time.monotonic()
         self._tick_count = 0
         self._press_pos: QPoint | None = None
+        self._press_on_arrow = False
+        self._arrow_hover = False
+        self._panel_open = False
         self._drag_offset: QPoint | None = None
         self._sequence: list[tuple[str, float]] = []
         self._sequence_until = 0.0
@@ -96,6 +105,11 @@ class CatWidget(QWidget):
 
     def set_auto_edit(self, on: bool) -> None:
         self._auto_edit = on
+
+    def set_panel_open(self, open_: bool) -> None:
+        """The arrow points down to open the panel and up once it's open."""
+        self._panel_open = open_
+        self.update()
 
     def poke(self) -> None:
         """Something happened: wake up."""
@@ -162,7 +176,38 @@ class CatWidget(QWidget):
             self._badge(p, "." * (1 + self._tick_count // 3 % 3), QColor("#ffffff"))
         elif self.sleeping:
             self._draw_zs(p)
+        self._draw_arrow(p)
         p.end()
+
+    def _arrow_rect(self) -> QRectF:
+        x = HEAD_X * config.SCALE - ARROW_W / 2
+        y = BADGE_SPACE + self._sprite_h + (ARROW_SPACE - ARROW_H) / 2
+        return QRectF(x, y, ARROW_W, ARROW_H)
+
+    def _draw_arrow(self, p: QPainter) -> None:
+        """A small frosted pill with a chevron, like the arrow in the design."""
+        r = self._arrow_rect()
+        p.setRenderHint(QPainter.RenderHint.Antialiasing)
+        p.setPen(Qt.PenStyle.NoPen)
+        for grow, alpha in ((2.5, 14), (1.2, 22)):  # a soft shadow underneath
+            p.setBrush(QColor(0, 0, 0, alpha))
+            p.drawRoundedRect(r.adjusted(-grow, -grow + 2, grow, grow + 2), ARROW_H / 2 + grow, ARROW_H / 2 + grow)
+        p.setBrush(QColor(255, 255, 255, 245 if self._arrow_hover else 215))
+        p.setPen(QPen(QColor(0, 0, 0, 34), 1))
+        p.drawRoundedRect(r, ARROW_H / 2, ARROW_H / 2)
+        cx, cy, half, rise = r.center().x(), r.center().y(), 5.0, 2.6
+        if self._panel_open:
+            rise = -rise
+        chevron = QPainterPath()
+        chevron.moveTo(cx - half, cy - rise)
+        chevron.lineTo(cx, cy + rise)
+        chevron.lineTo(cx + half, cy - rise)
+        pen = QPen(QColor("#1C1C1E"), 2.4)
+        pen.setCapStyle(Qt.PenCapStyle.RoundCap)
+        pen.setJoinStyle(Qt.PenJoinStyle.RoundJoin)
+        p.setPen(pen)
+        p.setBrush(Qt.BrushStyle.NoBrush)
+        p.drawPath(chevron)
 
     def _draw_zs(self, p: QPainter) -> None:
         """Pixel z's that float up from the sleeping cat's head, growing and fading as they go."""
@@ -208,10 +253,16 @@ class CatWidget(QWidget):
     def mousePressEvent(self, event):
         if event.button() == Qt.MouseButton.LeftButton:
             self._press_pos = event.globalPosition().toPoint()
+            self._press_on_arrow = self._arrow_rect().contains(event.position())
             self._drag_offset = None
 
     def mouseMoveEvent(self, event):
         if self._press_pos is None:
+            hover = self._arrow_rect().contains(event.position())
+            if hover != self._arrow_hover:
+                self._arrow_hover = hover
+                self.setCursor(Qt.CursorShape.PointingHandCursor if hover else Qt.CursorShape.OpenHandCursor)
+                self.update()
             return
         pos = event.globalPosition().toPoint()
         if self._drag_offset is None:
@@ -230,11 +281,20 @@ class CatWidget(QWidget):
         self.setCursor(Qt.CursorShape.OpenHandCursor)
         if was_drag:
             self.poke()
+        elif self._press_on_arrow:
+            self.poke()
+            self.arrow_clicked.emit()
         elif self.sleeping:
             self.wake_up(then=self.clicked.emit)
         elif not self._sequence:
             self.poke()
             self.clicked.emit()
+
+    def leaveEvent(self, event):
+        if self._arrow_hover:
+            self._arrow_hover = False
+            self.setCursor(Qt.CursorShape.OpenHandCursor)
+            self.update()
 
     def contextMenuEvent(self, event):
         menu = QMenu(self)

@@ -100,12 +100,12 @@ def screenshot(max_px: int = 1600) -> bytes:
         return path.read_bytes()
 
 
-def open_in_editor(file_path: str, line: int = 0) -> str:
+def open_in_editor(file_path: str, line: int = 0, use_vscode: bool = True) -> str:
     """Open a file in VS Code at a line if the `code` command exists, otherwise in its default app."""
     path = os.path.expanduser(file_path)
     if not os.path.exists(path):
         return f"No such file: {path}"
-    if shutil.which("code"):
+    if use_vscode and shutil.which("code"):
         target = f"{path}:{line}" if line else path
         subprocess.Popen(["code", "-g", target])
         return f"Opened {target} in VS Code."

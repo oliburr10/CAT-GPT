@@ -77,6 +77,23 @@ Restart the cat after you change these.
 - Before the cat **edits a file or runs a command**, the cloud asks first (for example "Can I
   change train.py?"), shows the change, and waits for **Allow** or **Don't**. Reading,
   searching and browsing happen without asking.
+- **The arrow under the cat** opens Ginger's panel, a frosted box with:
+  - **Mode**: *Study mode* for now (more modes will appear here). Ginger is told which mode
+    you're in.
+  - **Project** and **+**: pick the project you're working on, or make a new one (like
+    *Math 1*). It's the same project the Notepad's clipboard shows, so switching in either
+    place switches both, and Ginger is told which project you're in.
+  - **Connections**: the apps and sites Ginger may see and work in, each with a green dot
+    (connected) or a red one (not connected). **Disconnect** makes a tool off limits: Ginger
+    isn't told what you have open in it, won't take a screenshot while it's in front, and for
+    VS Code opens files in their default app instead. An amber dot means connected but
+    needing setup (VS Code without the `code` command). **Add a tool** adds Google Docs, Word,
+    Jupyter, Terminal, Xcode, PyCharm or Notion; right-click a tool to take it off the list.
+    Apps that aren't on the list work as they always have.
+  - **Open Notepad**.
+
+  On a Mac the panel has a real blur behind it. If that ever misbehaves, start the cat with
+  `CAT_FROSTED=0` for a plain light panel. Press **Esc** or click the arrow again to close it.
 - **Right-click** the cat for these options: *Talk to Ginger*, *Stop what you're doing*,
   *Look at my screen*, *Open Notepad*, *Watch mode*, *Edit files without asking*,
   *New conversation*, *Quit*.
@@ -303,6 +320,7 @@ All the settings are in [`catagent/config.py`](catagent/config.py):
 - `SCALE`: how big the cat is
 - `SLEEP_AFTER_SEC`: how long before it naps
 - `WATCH_INTERVAL_SEC`
+- `FROSTED`: the blur behind the panel (set `CAT_FROSTED=0` to turn it off)
 - `NOTES_DIR`: where the Notepad's clipboard keeps your projects (`~/Ginger`, or set
   `CAT_NOTES_DIR`)
 
@@ -319,6 +337,8 @@ catagent/
   app.py          wires everything together; window placement, watch mode, saved state
   cat_widget.py   the draggable, animated cat window
   command_bar.py  the input bar that pops up under the cat
+  panel.py        the frosted panel behind the arrow: mode, project, connections, Notepad
+  connections.py  which apps and sites Ginger may see and work in
   speech_cloud.py the pixel speech cloud: results, tips and Allow/Don't questions
   agent.py        the Claude Agent SDK session, on a background asyncio thread
   activity.py     what counts as coding, and the "Code changed" style labels
@@ -338,7 +358,7 @@ evals/
   run.py          `python -m evals.run`: the coding exam
   tasks/          one folder per exam task: task.json, project/, hidden_tests/
   swebench.py     `python -m evals.swebench`: the cat on SWE-bench, graded by the official harness
-tests/            `python -m pytest tests`: the clipboard, the notes checks and the .tex export
+tests/            `python -m pytest tests`: the clipboard, connections, the notes checks and the .tex export
 ```
 
 Qt runs the UI on the main thread. The agent runs on its own asyncio loop in a background

@@ -58,6 +58,22 @@ def make_project(name: str) -> str:
     return name
 
 
+def current_project() -> str:
+    """The project you're working in, shared by the cat's panel and the Notepad."""
+    try:
+        name = (config.HOME_DIR / "project.txt").read_text(encoding="utf-8").strip()
+    except OSError:
+        name = ""
+    return ensure_project(name)
+
+
+def set_current_project(name: str) -> None:
+    if name not in projects():
+        raise ClipboardError(f"There's no project called {name}.")
+    config.HOME_DIR.mkdir(parents=True, exist_ok=True)
+    (config.HOME_DIR / "project.txt").write_text(name, encoding="utf-8")
+
+
 def ensure_project(name: str = "") -> str:
     """The project to show: the one asked for if it exists, else the first, else a new one."""
     existing = projects()
