@@ -139,21 +139,27 @@ Ask the cat to help you understand, solve or prove something ("Prove that Trace(
 Trace(BA), I'm stuck"), from its input bar or from the Notepad, and instead of a speech cloud
 it writes **study notes** and opens them in the Notepad. Right-click the cat and choose
 *Open Notepad* to open it yourself. The notes look like a worked solution on a classroom
-whiteboard: a white page where everything, text included, is typeset in LaTeX, always in the
-same order:
+whiteboard, a white page typeset in LaTeX, and they get to the point first:
 
-1. **Question**, and a **short answer** to exactly what you're stuck on ("Why B and not C?").
-2. **Given**: every definition and fact you start from, as a formula with what it means in
-   plain words, then *To show*.
-3. **Solution**: one board per step. The derivation (lined up at the = signs, with which facts
-   it uses) sits on the left, and its figure on the right with a numbered caption: the same
-   small example carried through every step. A figure too wide for the side drops underneath.
-4. **Write-up**: the whole solution as you'd hand it in, with the key idea and a mistake to
-   watch out for.
-5. For multiple choice, **every option, checked**: what each one really computes, its value
-   and why it's right or wrong. Then the **answer**.
+1. **Problem**, then the **Answer** straight away: the result, and the key insight (or exactly
+   what you said you're stuck on).
+2. **Given** and **Find** side by side: everything you have, and exactly what you must find or show.
+3. **Methods you need**: every concept, definition and formula the solution uses (M1, M2, ...),
+   each with what it says in plain words and *why* it applies here. Nothing is used that isn't listed.
+4. **Plan**: the route from Given to Find in a sentence or two.
+5. **Solution**, in blocks named after what they work out ("Speed at the edge"), never "Step 1".
+   Each shows the methods it uses (click one to jump to it), the derivation lined up at the = signs,
+   what it means, and its **result**. A figure sits beside it.
+6. **Check** (units, limits, a number), **Takeaways** (the key idea and the common mistakes) and the
+   **Exam version**, folded away: the clean solution as you'd hand it in.
+7. For multiple choice, **every option, checked**: what each one really computes, its value and why
+   it's right or wrong.
 
-**Figures the Notepad draws itself.** Besides LaTeX pictures, a step can carry a figure the
+Colour is ink, one colour per idea (say, entries of *A* in orange, *B* in blue, the diagonal
+in green), the same in formulas, figures and text. A yellow highlighter marks at most three
+key results, so they stand out. Notes clipped in the earlier layout still open.
+
+**Figures the Notepad draws itself.** Besides LaTeX pictures, a solution block can carry a figure the
 Notepad draws on the spot, so it's instant and you can play with it:
 
 - **RNA folds.** Ginger gives the sequence and one or more ways it folds (dot-bracket), with
@@ -167,14 +173,10 @@ Notepad draws on the spot, so it's instant and you can play with it:
   it with [3Dmol.js](https://3dmol.org): drag to turn it, jump to the binding pocket, or let it
   spin. This needs an internet connection the first time.
 
-Try them without a model: `python -m catagent.notepad ribo`.
+Try them without a model: `python -m catagent.notepad ribo` (or `roll`, `purity`, `trace`).
 
-Colour is ink, one colour per idea (say, entries of *A* in orange, *B* in blue, the diagonal
-in green), the same in formulas, figures and text. A yellow highlighter marks at most three
-key results, so they stand out.
-
-There are no quizzes. Ask about any step in the chat box at the bottom ("explain step 3
-again") and the cat answers there or rewrites the notes. **Export .tex** saves them as a
+There are no quizzes. Ask about any part in the chat box at the bottom ("explain the speed at
+the edge again") and the cat answers there or rewrites the notes. **Export .tex** saves them as a
 LaTeX file that compiles with pdflatex or in Overleaf.
 
 The **Clipboard** panel on the right (the *Clipboard* button shows and hides it; opening it

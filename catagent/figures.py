@@ -195,8 +195,8 @@ def add_energies(notes: dict) -> dict:
         return notes
     import RNA
 
-    for step in notes.get("steps", []):
-        fig = step.get("figure")
+    for block in notes.get("solution") or []:
+        fig = block.get("figure") if isinstance(block, dict) else None
         if not isinstance(fig, dict) or fig.get("type") != "rna":
             continue
         compound = RNA.fold_compound(fig["sequence"])

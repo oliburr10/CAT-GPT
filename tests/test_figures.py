@@ -6,11 +6,11 @@ from catagent import examples, figures, study
 
 
 def rna_figure():
-    return copy.deepcopy(examples.RIBO_NOTES["steps"][1]["figure"])
+    return copy.deepcopy(examples.RIBO_NOTES["solution"][1]["figure"])
 
 
 def test_example_figures_are_valid():
-    for step in examples.RIBO_NOTES["steps"]:
+    for step in examples.RIBO_NOTES["solution"]:
         if "figure" in step:
             assert figures.problems(step["figure"], "f") == []
 
@@ -60,20 +60,20 @@ def test_molecule_mistakes_are_named():
 
 def test_notes_check_their_figures():
     notes = copy.deepcopy(examples.RIBO_NOTES)
-    notes["steps"][1]["picture"] = r"\text{also a picture}"
-    notes["steps"][0]["figure"]["pdb"] = "nope"
+    notes["solution"][1]["picture"] = r"\text{also a picture}"
+    notes["solution"][0]["figure"]["pdb"] = "nope"
     found = study.problems(notes)
-    assert "steps[2] has both picture and figure: keep one." in found
-    assert "steps[1].figure.pdb must be a 4-character PDB ID like 1Y26." in found
+    assert "solution[2] has both picture and figure: keep one." in found
+    assert "solution[1].figure.pdb must be a 4-character PDB ID like 1Y26." in found
 
 
 @pytest.mark.skipif(not figures.energies_available(), reason="ViennaRNA isn't installed")
 def test_energies_from_viennarna():
     notes = figures.add_energies(copy.deepcopy(examples.RIBO_NOTES))
-    off, on = notes["steps"][1]["figure"]["states"]
+    off, on = notes["solution"][1]["figure"]["states"]
     assert off["energy"] == pytest.approx(-30.7, abs=0.05)
     assert on["energy"] == pytest.approx(-24.5, abs=0.05)
-    assert "energy" not in examples.RIBO_NOTES["steps"][1]["figure"]["states"][0]   # the example is untouched
+    assert "energy" not in examples.RIBO_NOTES["solution"][1]["figure"]["states"][0]   # the example is untouched
 
 
 def test_tex_export_writes_figures_as_text():

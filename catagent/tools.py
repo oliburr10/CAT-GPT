@@ -22,7 +22,7 @@ def _text(msg: str, is_error: bool = False) -> dict:
 def _unpack(args: dict) -> dict:
     """Some models send nested fields as JSON strings; turn those back into lists and objects."""
     notes = dict(args)
-    for key in ("colors", "have", "goal", "steps", "solution"):
+    for key in ("answer", "colors", "given", "find", "methods", "solution", "checks", "options", "takeaways", "exam"):
         if isinstance(notes.get(key), str):
             try:
                 notes[key] = json.loads(notes[key])
@@ -136,9 +136,9 @@ def build_server(
     @tool(
         "write_study_notes",
         "Write study notes that teach how to solve a problem and open them in the Notepad, laid out "
-        "like a worked solution on a whiteboard: the question and a short answer, what is given, "
-        "the solution step by step (each a derivation with an optional figure and what it means), "
-        "the write-up, and for multiple choice every option checked. "
+        "that get to the point: the answer first, what is given and what to find, every method and "
+        "formula used (with what it says and why it applies), a plan, the solution in blocks named "
+        "after what they work out, checks, takeaways and the exam version. "
         "Use this whenever the user wants to understand, learn, solve or prove something.",
         study.SCHEMA,
     )

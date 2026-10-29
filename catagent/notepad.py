@@ -148,6 +148,8 @@ class Notepad(QWidget):
         saved = self._load()
         self.project = clipboard.current_project()
         self.current: dict | None = saved.get("current")          # {"id", "kind", "title", "notes" | "text"}
+        if self.current and study.is_old(self.current.get("notes")):
+            self.current["notes"] = study.upgrade(self.current["notes"])
         self.current_path: str | None = saved.get("current_path")  # where it's clipped, if it is
         self.from_disk = saved.get("from_disk", True)              # not written in this conversation
         self.side_open = saved.get("side_open", True)
@@ -267,8 +269,11 @@ class Notepad(QWidget):
 
     def open_clip(self, path: str) -> None:
         clip = clipboard.read_clip(self.project, path)
-        if clip["kind"] == "solution" and study.problems(clip.get("notes")):
-            raise ClipboardError("That clip's notes are damaged, so they can't be shown.")
+        if clip["kind"] == "solution":
+            if study.is_old(clip.get("notes")):
+                clip = {**clip, "notes": study.upgrade(clip["notes"])}   # written in the earlier format
+            elif study.problems(clip.get("notes")):
+                raise ClipboardError("That clip's notes are damaged, so they can't be shown.")
         self.current, self.current_path, self.from_disk = clip, path, True
         self.reply = self.error = ""
         self.refresh()
@@ -353,7 +358,7 @@ class Notepad(QWidget):
 
 
 def main() -> int:
-    """`python -m catagent.notepad [trace|purity|ribo]`: just the Notepad, on example notes.
+    """`python -m catagent.notepad [trace|purity|roll|ribo]`: just the Notepad, on example notes.
 
     With no argument it opens the trace example if nothing is open yet; with one, it opens that
     example (ribo has the RNA fold and 3D molecule figures). To ask Ginger for new notes, run the
@@ -366,9 +371,8 @@ def main() -> int:
     app = QApplication(sys.argv)
     app.setApplicationName(config.CAT_NAME)
     notepad = Notepad()
-    chosen = {"trace": examples.TRACE_NOTES, "purity": examples.PURITY_NOTES, "ribo": examples.RIBO_NOTES}
-    if len(sys.argv) > 1 and sys.argv[1] in chosen:
-        notepad.show_notes(chosen[sys.argv[1]])
+    if len(sys.argv) > 1 and sys.argv[1] in examples.EXAMPLES:
+        notepad.show_notes(examples.EXAMPLES[sys.argv[1]])
     elif notepad.current is None:
         notepad.show_notes(examples.TRACE_NOTES)
     notepad.asked.connect(lambda text: notepad.set_reply(

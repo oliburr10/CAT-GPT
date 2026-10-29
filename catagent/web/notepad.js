@@ -261,44 +261,74 @@ function renderNotes() {
     return el;
   });
 
-  const given = h("div", { class: "given" },
-    n.have.map((row) => h("div", { class: "fact" },
-      h("span", { class: "tag" }, "(" + row.label.replace(/^\(|\)$/g, "") + ")"),
-      h("div", { class: "fact-body" }, formula(row.formula), prose(row.meaning, "p", "meaning")))),
-    h("div", { class: "fact goal" },
-      h("span", { class: "tag" }, "To show."),
-      h("div", { class: "fact-body" }, formula(n.goal.formula), prose(n.goal.meaning, "p", "meaning"))));
+  // A solution block names the methods it uses; each name jumps to that method's card.
+  const methodName = {};
+  for (const m of n.methods || []) methodName[m.id] = m.name;
+  const chip = (id) => h("button", { type: "button", class: "method-chip", onClick: () => jumpTo("method-" + id) },
+    h("b", {}, id), methodName[id] ? prose(methodName[id]) : null);
 
-  // Each step is one board: the derivation, with its figure beside it when there is one.
-  const steps = n.steps.map((s, i) => {
+  const answer = n.answer || {};
+  const answerCard = answer.result || answer.text ? h("section", { class: "answer-card" },
+    h("span", { class: "label" }, "Answer"),
+    answer.result ? formula(answer.result, "answer-math") : null,
+    answer.text ? prose(answer.text, "p") : null) : null;
+
+  const find = n.find || {};
+  const givenFind = h("section", { class: "given-find" + ((n.given || []).length ? "" : " no-given") },
+    (n.given || []).length ? h("div", { class: "gf-col" },
+      h("h2", {}, "Given"),
+      h("div", { class: "given-list" }, n.given.map((g) => h("div", { class: "given-row" },
+        h("div", { class: "given-sym" }, inline("\\displaystyle " + g.symbol + (g.value ? " = " + g.value : ""))),
+        prose(g.meaning, "p", "given-meaning"))))) : null,
+    h("div", { class: "gf-col find" },
+      h("h2", {}, "Find"),
+      find.formula ? formula(find.formula, "find-math") : null,
+      find.meaning ? prose(find.meaning, "p", "meaning") : null));
+
+  const methods = (n.methods || []).length ? h("section", { class: "section" },
+    h("h2", {}, "Methods you need"),
+    h("div", { class: "methods" }, n.methods.map((m) => h("article", { class: "method", id: "method-" + m.id },
+      h("div", { class: "method-head" }, h("span", { class: "method-id" }, m.id), prose(m.name, "h3")),
+      formula(m.formula, "method-formula"),
+      m.says ? prose(m.says, "p", "method-says") : null,
+      m.why ? h("p", { class: "method-why" }, h("b", {}, "Why here. "), prose(m.why)) : null)))) : null;
+
+  const plan = n.plan ? h("section", { class: "plan" }, h("span", { class: "label" }, "Plan"), prose(n.plan, "p")) : null;
+
+  // The solution: blocks named after what they work out. Each shows its methods, the
+  // derivation, what it means and its result; a figure sits beside it (or under it).
+  const blocks = (n.solution || []).map((b) => {
     let figure = null;
-    if (s.figure) {
+    if (b.figure) {
       figures += 1;
       const drawn = h("div", { class: "drawn" });
-      Figures.render(drawn, s.figure, { colors: COLORS });
+      Figures.render(drawn, b.figure, { colors: COLORS });
       figure = h("figure", { class: "figure" }, drawn,
-        h("figcaption", {}, h("b", {}, "Figure " + figures + ". "), s.caption ? prose(s.caption) : null));
-    } else if (s.picture) {
+        h("figcaption", {}, h("b", {}, "Figure " + figures + ". "), b.caption ? prose(b.caption) : null));
+    } else if (b.picture) {
       figures += 1;
       figure = h("figure", { class: "figure" },
-        formula(s.picture, "figure-math"),
-        h("figcaption", {}, h("b", {}, "Figure " + figures + ". "), s.caption ? prose(s.caption) : null));
+        formula(b.picture, "figure-math"),
+        h("figcaption", {}, h("b", {}, "Figure " + figures + ". "), b.caption ? prose(b.caption) : null));
     }
+    const uses = (b.uses || []).length
+      ? h("div", { class: "uses-row" }, h("span", { class: "label" }, "Uses"), b.uses.map(chip))
+      : b.uses_text ? prose("Uses " + b.uses_text + ".", "p", "uses") : null;
     // Figures the Notepad draws (a fold, a 3D molecule) get the full width, under the derivation.
-    return h("section", { class: "board" + (figure ? " has-figure" : "") + (s.figure ? " stacked" : "") },
+    return h("section", { class: "board" + (figure ? " has-figure" : "") + (b.figure ? " stacked" : "") },
       h("div", { class: "derivation" },
-        h("span", { class: "step-no" }, "Step " + (i + 1)),
-        prose(s.title, "h3"),
-        prose("Uses " + s.uses + ".", "p", "uses"),
-        formula(s.formula, "display"),
-        s.expansion ? formula(s.expansion, "expansion") : null,
-        prose(s.meaning, "p", "what")),
+        prose(b.title, "h3"),
+        uses,
+        formula(b.work, "display"),
+        b.expansion ? formula(b.expansion, "expansion") : null,
+        prose(b.explain, "p", "what"),
+        b.result ? h("div", { class: "result" }, h("span", { class: "label" }, "Result"), formula(b.result, "result-math")) : null),
       figure);
   });
 
-  const sol = n.solution;
-  const writeup = h("ol", { class: "writeup" }, sol.steps.map((s) =>
-    h("li", {}, prose(s.text, "p"), s.formula ? formula(s.formula, "writeup-math") : null)));
+  const checks = (n.checks || []).length ? h("section", { class: "section" },
+    h("h2", {}, "Check"),
+    h("ul", { class: "checks" }, n.checks.map((c) => h("li", {}, icon("check"), prose(c))))) : null;
 
   const options = (n.options || []).length ? h("section", { class: "section" },
     h("h2", {}, "Every option, checked"),
@@ -310,28 +340,46 @@ function renderNotes() {
         h("td", { class: "num" }, o.value || "–"),
         h("td", {}, prose(o.verdict)))))))) : null;
 
+  const take = n.takeaways || {};
+  const takeaways = h("section", { class: "takeaways-box" },
+    h("div", { class: "head" }, h("h2", {}, "Takeaways"), h("span", { class: "clip-slot" }, clipStatus("pill"))),
+    take.key_idea ? h("p", { class: "key-idea" }, h("b", {}, "Key idea. "), prose(take.key_idea)) : null,
+    (take.mistakes || []).length ? h("div", { class: "mistakes" },
+      h("b", {}, "Common mistakes"),
+      h("ul", {}, take.mistakes.map((m) => h("li", {}, prose(m))))) : null);
+
+  const exam = (n.exam || []).length ? h("details", { class: "exam" },
+    h("summary", {}, "Exam version", h("span", { class: "exam-sub" }, "the solution as you’d hand it in")),
+    h("ol", { class: "writeup" }, n.exam.map((e) =>
+      h("li", {}, prose(e.text, "p"), e.formula ? formula(e.formula, "writeup-math") : null)))) : null;
+
   root.replaceChildren(...[
     h("header", { class: "doc-head" },
       h("span", { class: "kicker" }, "Worked solution"),
       prose(n.title, "h1"),
       legend.length ? h("div", { class: "legend" }, legend) : null),
-    h("section", { class: "problem" }, h("span", { class: "label" }, "Question"), prose(n.asked, "p", "asked")),
-    n.short_answer ? h("section", { class: "short" }, h("span", { class: "label" }, "Short answer"), prose(n.short_answer, "p")) : null,
-    h("section", { class: "section" }, h("h2", {}, "Given"), given),
-    h("section", { class: "section" },
-      h("h2", {}, "Solution"),
-      n.example ? prose(n.example, "p", "lead") : null,
-      h("div", { class: "boards" }, steps)),
-    h("section", { class: "section writeup-box" },
-      h("div", { class: "head" }, h("h2", {}, "Write-up"), h("span", { class: "clip-slot" }, clipStatus("pill"))),
-      sol.intro ? prose(sol.intro, "p") : null,
-      writeup,
-      h("p", { class: "remark" }, h("b", {}, "Key idea. "), prose(sol.key_idea)),
-      sol.watch_out ? h("p", { class: "remark" }, h("b", {}, "Watch out. "), prose(sol.watch_out)) : null),
+    h("section", { class: "problem" }, h("span", { class: "label" }, "Problem"), prose(n.asked, "p", "asked")),
+    answerCard,
+    givenFind,
+    methods,
+    plan,
+    blocks.length ? h("section", { class: "section" }, h("h2", {}, "Solution"), h("div", { class: "boards" }, blocks)) : null,
+    checks,
     options,
-    n.answer ? h("section", { class: "final" }, h("span", { class: "label" }, "Answer"), formula(n.answer, "answer-math")) : null,
+    takeaways,
+    exam,
   ].filter(Boolean));
   requestAnimationFrame(fitFigures);
+}
+
+// Scroll to a method's card and let it light up for a moment.
+function jumpTo(id) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.scrollIntoView({ behavior: "smooth", block: "center" });
+  el.classList.remove("flash");
+  void el.offsetWidth;   // restart the animation
+  el.classList.add("flash");
 }
 
 // A figure beside its derivation can be wider than its column (a matrix product, say). If it would
@@ -464,7 +512,7 @@ function thisNoteCard() {
       h("span", { class: "hint" }, "Notes " + S.catName + " writes show up here, ready to clip into a folder."));
   }
   const sub = current.kind === "solution"
-    ? "Formulas, " + current.notes.steps.length + " steps and the complete solution"
+    ? (current.notes.methods || []).length + " methods, a " + (current.notes.solution || []).length + "-part solution and the exam version"
     : KIND_NAMES[current.kind];
   const elsewhere = S.currentPath && parentOf(S.currentPath) !== view.selected;
   return h("div", { class: "card" },

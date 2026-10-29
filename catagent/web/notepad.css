@@ -85,23 +85,48 @@ svg { fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; 
 
 .problem { display: flex; flex-direction: column; gap: 6px; padding: 24px 28px; border-radius: 20px; background: var(--soft); }
 .problem .asked { white-space: pre-wrap; max-width: 72ch; }
-.short { display: flex; flex-direction: column; gap: 4px; padding: 18px 24px; border-radius: 18px; border: 1px solid var(--green-ink); }
+/* the answer, straight after the problem */
+.answer-card { display: flex; flex-direction: column; gap: 4px; padding: 18px 24px 20px; border-radius: 18px; border: 1.5px solid var(--green-ink); }
+.answer-card .answer-math { font-size: 24px; }
+
+/* what you have, and what you must find */
+.given-find { display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr); gap: 20px; align-items: start; }
+.given-find.no-given { grid-template-columns: minmax(0, 1fr); }
+.gf-col { min-width: 0; display: flex; flex-direction: column; gap: 10px; padding: 20px 22px; border-radius: 18px; border: 1px solid var(--line-2); }
+.gf-col h2 { font-size: 22px; }
+.given-list { display: flex; flex-direction: column; }
+.given-row { display: grid; grid-template-columns: minmax(0, auto) minmax(0, 1fr); gap: 4px 16px; align-items: baseline; padding: 7px 0; border-top: 1px solid var(--line); }
+.given-row:first-child { border-top: none; }
+.given-sym { white-space: nowrap; overflow-x: auto; overflow-y: hidden; font-size: 19px; }
+.given-meaning { color: var(--ink-3); font-size: 16.5px; line-height: 1.5; }
+.find { background: var(--soft); border-color: var(--soft); }
+.find-math { font-size: 21px; }
+
+/* every tool, explained before it is used */
+.methods { display: grid; grid-template-columns: minmax(0, 1fr); gap: 14px; }
+@container (min-width: 860px) { .methods { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); } }
+.method { min-width: 0; display: flex; flex-direction: column; gap: 6px; padding: 16px 20px 18px; border-radius: 16px; border: 1px solid var(--line-2); scroll-margin: 80px; }
+.method-head { display: flex; align-items: baseline; gap: 10px; }
+.method-head h3 { font-size: 19px; }
+.method-id { flex: none; font-weight: 700; font-size: 15px; color: var(--muted); }
+.method-formula { font-size: 19px; }
+.method-says { color: var(--ink-2); font-size: 16.5px; line-height: 1.5; }
+.method-why { color: var(--muted); font-size: 16px; line-height: 1.5; }
+.method-why b { font-style: italic; color: var(--ink-3); }
+.method.flash { animation: flash 1.4s ease; }
+@keyframes flash { 0%, 30% { background: var(--marker); } 100% { background: transparent; } }
+
+.plan { display: flex; flex-direction: column; gap: 4px; padding: 16px 22px; border-radius: 16px; background: var(--soft); }
 
 .section { display: flex; flex-direction: column; gap: 16px; }
 .lead { color: var(--muted); }
 
-.given { display: flex; flex-direction: column; border-top: 1px solid var(--line-2); }
-.fact { display: grid; grid-template-columns: 82px minmax(0, 1fr); gap: 16px; padding: 14px 0; border-bottom: 1px solid var(--line-2); }
-.fact .tag { padding-top: 8px; font-weight: 700; color: var(--muted); }
-.fact.goal .tag { color: var(--ink); font-style: italic; }
-.fact-body { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
-.fact .meaning { color: var(--ink-3); }
-.formula, .display, .expansion, .figure-math, .writeup-math, .answer-math { overflow-x: auto; overflow-y: hidden; }
+.formula, .display, .expansion, .figure-math, .writeup-math, .answer-math, .find-math, .method-formula, .result-math { overflow-x: auto; overflow-y: hidden; }
 .formula { font-size: 20px; }
-.formula .katex-display, .display .katex-display, .expansion .katex-display, .writeup-math .katex-display { margin: 0.25em 0; text-align: left; }
-.formula .katex-display > .katex, .display .katex-display > .katex, .expansion .katex-display > .katex, .writeup-math .katex-display > .katex { text-align: left; }
+.notes .katex-display { margin: 0.25em 0; text-align: left; }
+.notes .katex-display > .katex { text-align: left; }
 
-/* one board per step: derivation left, figure right (stacked when the window is narrow) */
+/* one board per solution block: derivation left, figure right (stacked when narrow or wide) */
 .boards { display: flex; flex-direction: column; }
 .board { display: grid; grid-template-columns: minmax(0, 1fr); gap: 24px; padding: 30px 0; border-top: 1px solid var(--line-2); }
 .board:first-child { border-top: none; padding-top: 6px; }
@@ -112,6 +137,15 @@ svg { fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; 
 .derivation { min-width: 0; display: flex; flex-direction: column; gap: 10px; }
 .derivation h3 { margin-top: -6px; }
 .uses { font-style: italic; color: var(--muted); font-size: 17px; }
+.uses-row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: -2px; }
+.uses-row .label { font-size: 14px; margin-right: 2px; }
+.method-chip { display: inline-flex; align-items: baseline; gap: 6px; height: 28px; padding: 0 11px; border-radius: 999px; border: 1px solid var(--line-2); background: #FFFFFF; font-size: 14.5px; color: var(--ink-2); }
+.method-chip b { color: var(--muted); }
+.method-chip:hover { border-color: #C9C9CF; background: var(--soft); }
+.result { display: flex; align-items: center; flex-wrap: wrap; gap: 4px 14px; padding: 8px 16px; border-radius: 12px; background: var(--soft); align-self: flex-start; max-width: 100%; }
+.result .label { font-size: 14px; }
+.result-math { font-size: 20px; min-width: 0; }
+.result-math .katex-display { margin: 0; }
 .display { font-size: 21px; }
 .expansion { font-size: 19px; color: var(--ink-2); }
 .what { color: var(--ink-2); }
@@ -142,12 +176,24 @@ svg { fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; 
 .mol-key { display: inline-flex; align-items: center; gap: 6px; }
 .mol-key i { width: 10px; height: 10px; border-radius: 3px; display: inline-block; }
 
-.writeup-box { padding: 28px 30px; border-radius: 20px; border: 1px solid var(--line-2); }
-.writeup-box .head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 8px; }
-.writeup { margin: 0; padding-left: 1.6em; display: flex; flex-direction: column; gap: 10px; }
+.checks { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.checks li { display: flex; gap: 10px; align-items: baseline; }
+.checks li > svg { flex: none; width: 15px; height: 15px; stroke-width: 2.8; color: var(--ok); transform: translateY(2px); }
+
+.takeaways-box { display: flex; flex-direction: column; gap: 12px; padding: 24px 28px; border-radius: 20px; border: 1px solid var(--line-2); }
+.takeaways-box .head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 8px; }
+.key-idea b, .mistakes > b { font-style: italic; }
+.mistakes ul { margin: 4px 0 0; padding-left: 1.3em; display: flex; flex-direction: column; gap: 4px; }
+
+.exam { border-radius: 18px; background: var(--soft); padding: 4px 24px; }
+.exam summary { cursor: pointer; padding: 14px 0; font-weight: 700; font-size: 19px; list-style: none; }
+.exam summary::-webkit-details-marker { display: none; }
+.exam summary::before { content: "▸"; display: inline-block; width: 1.1em; color: var(--muted); transition: transform 0.2s ease; }
+.exam[open] summary::before { transform: rotate(90deg); }
+.exam-sub { margin-left: 10px; font-weight: 400; font-size: 16px; color: var(--muted); font-style: italic; }
+.writeup { margin: 0 0 18px; padding-left: 1.6em; display: flex; flex-direction: column; gap: 10px; }
 .writeup li::marker { color: var(--muted); }
 .writeup-math { font-size: 20px; }
-.remark b { font-style: italic; }
 
 .table-wrap { overflow-x: auto; border: 1px solid var(--line-2); border-radius: 18px; }
 .notes table { border-collapse: collapse; width: 100%; min-width: 560px; font-size: 17px; }
@@ -160,9 +206,6 @@ svg { fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; 
 .notes tr.right td { background: rgba(30, 138, 80, 0.06); }
 .notes tr.right td.letter { color: var(--green-ink); }
 
-.final { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 26px 20px; border-radius: 20px; background: var(--soft); text-align: center; }
-.answer-math { max-width: 100%; font-size: 24px; }
-.answer-math .katex-display { margin: 0.1em 0; }
 
 .status-pill { display: inline-flex; align-items: center; gap: 6px; font-size: 14px; color: var(--ok-ink); padding: 4px 11px; border-radius: 999px; background: #E3F2E7; }
 .status-pill svg { width: 14px; height: 14px; stroke-width: 2.8; color: var(--ok); }
@@ -177,7 +220,7 @@ svg { fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; 
 .writing i:nth-child(2) { animation-delay: 0.2s; }
 .writing i:nth-child(3) { animation-delay: 0.4s; }
 @keyframes blink { 0%, 80%, 100% { opacity: 0.25; } 40% { opacity: 1; } }
-@media (prefers-reduced-motion: reduce) { .writing i { animation: none; opacity: 0.6; } }
+@media (prefers-reduced-motion: reduce) { .writing i { animation: none; opacity: 0.6; } .method.flash { animation: none; } }
 
 .note-card { display: flex; flex-direction: column; gap: 10px; padding: 24px 28px; border-radius: 20px; background: var(--soft); }
 .note-card .kind { font-variant: small-caps; letter-spacing: 0.06em; font-size: 15px; color: var(--muted); display: inline-flex; align-items: center; gap: 6px; }
@@ -287,7 +330,7 @@ svg { fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; 
 @media (max-width: 760px) {
   .titlebar { flex-wrap: wrap; }
   .notes { padding: 28px 18px 48px; gap: 32px; }
-  .problem, .writeup-box { padding: 20px; }
-  .fact { grid-template-columns: minmax(0, 1fr); gap: 2px; }
+  .problem, .takeaways-box { padding: 20px; }
+  .given-find { grid-template-columns: minmax(0, 1fr); }
   .chat { padding: 10px 12px 12px; }
 }

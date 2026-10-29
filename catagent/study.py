@@ -1,17 +1,23 @@
 """Study notes: the format Ginger writes them in, how they're checked, and the .tex export.
 
-Notes read like a worked solution on a whiteboard, always in the same order:
-  1. The question, and optionally a short answer to what the student is actually stuck on.
-  2. Given: the definitions and facts you start from, each a formula with what it means, then the goal.
-  3. Solution: every step is a derivation (formula, then the example written out) with an optional
-     figure beside it, and says in words what it means.
-  4. Write-up: the whole solution as you'd hand it in, plus the key idea and a common mistake.
-  5. Optionally, for multiple choice, every option checked; and the final answer.
+Notes get to the point first, then show every tool before using it:
+  1. The problem, and the answer straight away: the result and the key insight.
+  2. Given and Find: what you have, and exactly what you must find or show.
+  3. Methods: every concept, definition or formula the solution uses (M1, M2, ...), with what
+     it says and why it applies here. Nothing is used that isn't listed.
+  4. Plan: the route from Given to Find in a sentence or two.
+  5. Solution: blocks named after what they work out ("Speed at the edge"), never "Step 1".
+     Each names the methods it uses, shows the derivation, explains it and ends in a result.
+     A block may carry a figure.
+  6. Checks, the takeaways (key idea, common mistakes), and the exam version to hand in.
+  For multiple choice, every option is checked too.
 
 Formulas are LaTeX. Text fields are plain sentences that may contain $inline math$. Coloured ink ties
 the formulas, the figures and the words together: \\blue{b_{ji}}, \\orange{a_{ij}}, \\green{(AB)_{ii}},
 \\purple{...}, \\red{...}. \\hl{...} is a highlighter for the two or three results that matter most.
 The Notepad (KaTeX) and the .tex export define them the same way.
+
+Notes written in the earlier format (have, goal, steps) still open: upgrade() converts them.
 """
 
 import re
@@ -29,70 +35,79 @@ SCHEMA = {
     "properties": {
         "title": {"type": "string", "description": "Short title; may contain $inline math$."},
         "asked": {"type": "string", "description": "The question, as the user asked it."},
-        "short_answer": {"type": "string", "description": "Optional: one or two sentences that answer what the "
-                                                          "user is actually stuck on, before the full solution."},
+        "answer": {
+            "type": "object",
+            "description": "The answer, straight away.",
+            "properties": {
+                "result": {**_LATEX, "description": "The final result in one line of LaTeX."},
+                "text": {**_TEXT, "description": "One or two sentences: the key insight, or exactly what the user is stuck on."},
+            },
+            "required": ["result", "text"],
+        },
         "colors": {
             "type": "array",
-            "description": "What each highlight colour stands for, e.g. beige = entries of $A$.",
+            "description": "What each ink colour stands for, e.g. orange = entries of $A$.",
             "items": {
                 "type": "object",
                 "properties": {"color": {"type": "string", "enum": list(COLORS)}, "meaning": _TEXT},
                 "required": ["color", "meaning"],
             },
         },
-        "have": {
+        "given": {
             "type": "array",
-            "description": "What you have: the definitions and facts to start from.",
+            "description": "Everything the problem gives: quantities, data, assumptions.",
             "items": {
                 "type": "object",
                 "properties": {
-                    "label": {"type": "string", "description": "A short tag like D1, D2."},
-                    "formula": _LATEX,
+                    "symbol": {**_LATEX, "description": "e.g. h_1, or A \\in \\mathbb{R}^{n\\times m}."},
+                    "value": {**_LATEX, "description": "Optional, e.g. 0.0500\\ \\text{m}."},
                     "meaning": _TEXT,
                 },
-                "required": ["label", "formula", "meaning"],
+                "required": ["symbol", "meaning"],
             },
         },
-        "goal": {
+        "find": {
             "type": "object",
+            "description": "Exactly what must be found or shown.",
             "properties": {"formula": _LATEX, "meaning": _TEXT},
             "required": ["formula", "meaning"],
         },
-        "example": {"type": "string", "description": "The small concrete example the pictures use, if any."},
-        "steps": {
+        "methods": {
             "type": "array",
+            "description": "Every concept, definition, theorem or formula the solution uses.",
             "items": {
                 "type": "object",
                 "properties": {
-                    "title": _TEXT,
-                    "uses": {"type": "string", "description": "Which facts or steps it uses, e.g. (D3) with k = i."},
+                    "id": {"type": "string", "description": "M1, M2, ... in the order they are first used."},
+                    "name": {"type": "string", "description": "e.g. Energy conservation."},
                     "formula": _LATEX,
-                    "picture": {"type": "string", "description": "Optional LaTeX figure, e.g. coloured matrices or a table."},
-                    "figure": figures.SCHEMA,
-                    "caption": {"type": "string", "description": "Optional: one sentence under the figure."},
-                    "expansion": {"type": "string", "description": "Optional LaTeX: the formula written out for the example."},
-                    "meaning": _TEXT,
+                    "says": {**_TEXT, "description": "What the formula says, in plain words, with what each symbol means."},
+                    "why": {**_TEXT, "description": "Why it applies to this problem, or when to reach for it."},
                 },
-                "required": ["title", "uses", "formula", "meaning"],
+                "required": ["id", "name", "formula", "says", "why"],
             },
         },
+        "plan": {**_TEXT, "description": "The route from given to find in one or two sentences, naming the methods."},
         "solution": {
-            "type": "object",
-            "properties": {
-                "intro": _TEXT,
-                "steps": {
-                    "type": "array",
-                    "items": {
-                        "type": "object",
-                        "properties": {"text": _TEXT, "formula": _LATEX},
-                        "required": ["text"],
-                    },
+            "type": "array",
+            "description": "The worked solution, in blocks.",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "title": {**_TEXT, "description": "What this block works out, e.g. Speed at the edge. Never Step 1."},
+                    "uses": {"type": "array", "items": {"type": "string"}, "description": "Method ids, e.g. [\"M2\"]."},
+                    "work": {**_LATEX, "description": "The derivation, lined up at = with \\begin{aligned}."},
+                    "expansion": {**_LATEX, "description": "Optional: the same written out for the example or numbers."},
+                    "result": {**_LATEX, "description": "What this block found, in one line."},
+                    "explain": {**_TEXT, "description": "One or two sentences: what happened and why."},
+                    "picture": {**_LATEX, "description": "Optional LaTeX figure, e.g. coloured matrices or a table."},
+                    "figure": figures.SCHEMA,
+                    "caption": {**_TEXT, "description": "Optional: one sentence under the figure."},
                 },
-                "key_idea": _TEXT,
-                "watch_out": _TEXT,
+                "required": ["title", "uses", "work", "result", "explain"],
             },
-            "required": ["steps", "key_idea"],
         },
+        "checks": {"type": "array", "items": _TEXT, "description": "Quick ways to see the answer is right."},
         "options": {
             "type": "array",
             "description": "Only for multiple choice: every option, what it really computes and why it is right or wrong.",
@@ -108,27 +123,45 @@ SCHEMA = {
                 "required": ["option", "computes", "verdict", "correct"],
             },
         },
-        "answer": {"type": "string", "description": "Optional LaTeX: the final answer in one line."},
+        "takeaways": {
+            "type": "object",
+            "properties": {
+                "key_idea": {**_TEXT, "description": "The one idea to remember."},
+                "mistakes": {"type": "array", "items": _TEXT, "description": "Common mistakes, and how to avoid them."},
+            },
+            "required": ["key_idea", "mistakes"],
+        },
+        "exam": {
+            "type": "array",
+            "description": "The clean solution as the user would hand it in.",
+            "items": {"type": "object", "properties": {"text": _TEXT, "formula": _LATEX}, "required": ["text"]},
+        },
     },
-    "required": ["title", "asked", "have", "goal", "steps", "solution"],
+    "required": ["title", "asked", "answer", "given", "find", "methods", "plan", "solution", "takeaways", "exam"],
 }
 
 RULES = """\
 Study mode. When {user} wants to understand, learn, solve or prove something (maths, physics, \
-statistics, any worked problem), don't explain it in your speech cloud: write study notes with \
-write_study_notes, which opens them in the Notepad. Then reply with one short sentence.
+statistics, biology, any worked problem), don't explain it in your speech cloud: write study notes \
+with write_study_notes, which opens them in the Notepad. Then reply with one short sentence.
 
-The notes read like a worked solution on a classroom whiteboard, so {user} learns it rather than \
-just seeing an answer:
-- If {user} says what they're stuck on, answer exactly that first in short_answer, in one or two sentences.
-- Given (have): every definition or fact the problem gives or needs, written as a formula, each \
-with a plain-words meaning. The goal goes only in goal, not in have.
-- Solve it step by step. Each step is one move: a formula that follows from the facts or earlier \
-steps (say which in uses), the example written out in expansion, and what it means in plain words. \
-Prefer a few clear steps over many tiny ones. Line derivations up with \\begin{{aligned}} ... &= ... \\end{{aligned}}.
-- Use one small concrete example and continue the same figure through the steps, each with a \
-one-sentence caption. A figure is either picture (LaTeX: coloured matrices, a small table) or \
-figure, which the Notepad draws itself:
+The notes get to the point at once and explain every tool before it is used:
+- answer: the final result first, in one line (result), and one or two sentences on the key \
+insight (text). If {user} says what they're stuck on, answer exactly that here.
+- given: everything the problem gives, each as a symbol, its value if it has one, and what it \
+means. find: exactly what must be found or shown.
+- methods: every concept, definition, theorem or formula the solution uses, one per entry, \
+M1, M2, ... in the order they are first used: its name, the formula, what it says in plain words \
+with what each symbol means (says), and why it applies to this problem (why). The solution may \
+use nothing that isn't listed, and every method must be used.
+- plan: the route from given to find in one or two sentences, naming the methods.
+- solution: blocks in order. Title each block by what it works out ("Speed at the edge", "The \
+trace of AB"), never "Step 1". List the methods it uses (uses, e.g. ["M2", "M3"]), show the work \
+as a derivation lined up at the = signs with \\begin{{aligned}} ... &= ... \\end{{aligned}}, give its \
+result in one line, and explain in one or two sentences what happened and why. Prefer a few \
+substantial blocks over many tiny ones. Optional: expansion (the same with the numbers or a \
+small example), and a figure: either picture (LaTeX: coloured matrices, a small table) or \
+figure, which the Notepad draws itself, each with a one-sentence caption.
   - figure type rna, for anything about RNA folding (riboswitches, attenuators, hairpins, \
 tRNA): the sequence, one or more folds in dot-bracket (each with a name, a note and whether the \
 ligand is bound), coloured regions (e.g. the SD in orange) and the ligand with the bases around \
@@ -136,21 +169,23 @@ its pocket. The Notepad animates between the folds. Pairs must be A-U, G-C or G-
 model sequence if you don't know a real one, and say so in the caption.
   - figure type molecule, for a real 3D structure: a PDB ID you are certain of, residues to \
 highlight with labels, and the ligand's residue name. Never guess a PDB ID.
+- checks: quick ways to see the answer is right: units, a limit or special case, a number.
+- takeaways: the key idea in one sentence, and the common mistakes with how to avoid them.
+- exam: the clean solution as {user} would hand it in, in a few numbered lines.
+- Multiple choice: fill options with every option, what it really computes (rewritten in the \
+problem's own notation), its value if the numbers allow, and why it's right or wrong.
 - Colour is ink, used for ideas: pick one colour per idea (say what each means in colors) and use \
 it for that idea everywhere, in formulas, figures and text: \\blue{{...}}, \\orange{{...}}, \
-\\green{{...}}, \\purple{{...}}, \\red{{...}}. In text, colour inside math, e.g. $\\orange{{\\text{{row }} i}}$.
-- Highlight with \\hl{{...}} only the two or three results that matter most (at most three), never decoration.
-- Finish with the write-up (solution): the whole solution as {user} would hand it in, in numbered \
-steps, plus the key idea and a common mistake to watch out for.
-- Multiple choice: fill options with every option, what it really computes (rewritten in the \
-problem's own notation), its value if the numbers allow, and why it's right or wrong. Put the \
-final result in answer.
+\\green{{...}}, \\purple{{...}}, \\red{{...}}. In text, colour inside math, e.g. $\\orange{{\\text{{row }} i}}$. \
+Highlight with \\hl{{...}} only the two or three results that matter most (at most three).
 - No quizzes or questions for {user} to answer. Text fields are plain sentences, and every bit of \
 maths in them goes inside $...$ (write $(AB)_{{ii}}$, never (AB)_{{ii}}); no Markdown. Formulas, \
 figures and expansions are LaTeX without $ signs, KaTeX-compatible.
 - If {user} asks a follow-up about notes from the Notepad, either answer in one or two sentences, \
-or, if a step needs more explaining, call write_study_notes again with the improved notes.
+or, if a block needs more explaining, call write_study_notes again with the improved notes.
 """
+
+_METHOD_ID = re.compile(r"M[1-9]\d*")
 
 
 def problems(notes: dict) -> list[str]:
@@ -203,60 +238,92 @@ def problems(notes: dict) -> list[str]:
             return []
         return value
 
+    def obj(value, where, keys):
+        if not isinstance(value, dict):
+            found.append(f"{where} must be an object with {' and '.join(keys)}.")
+            return {}
+        return value
+
     if not isinstance(notes, dict):
         return ["The notes must be a JSON object."]
     used: set[str] = set()
     highlights = [0]
     text(notes.get("title"), "title")
     text(notes.get("asked"), "asked", verbatim=True)
-    if notes.get("short_answer"):
-        text(notes["short_answer"], "short_answer")
+
+    answer = obj(notes.get("answer"), "answer", ["result", "text"])
+    if answer:
+        latex(answer.get("result"), "answer.result")
+        text(answer.get("text"), "answer.text")
+
     for i, c in enumerate(items(notes.get("colors", []), "colors", minimum=0), 1):
         if c.get("color") not in COLORS:
             found.append(f"colors[{i}].color must be one of {', '.join(COLORS)}.")
         text(c.get("meaning"), f"colors[{i}].meaning")
-    for i, h in enumerate(items(notes.get("have"), "have"), 1):
-        text(h.get("label"), f"have[{i}].label")
-        if str(h.get("label", "")).strip("() ").lower() == "goal":
-            found.append(f"have[{i}] is the goal: put it only in goal, not in have.")
-        latex(h.get("formula"), f"have[{i}].formula")
-        text(h.get("meaning"), f"have[{i}].meaning")
-    goal = notes.get("goal")
-    if isinstance(goal, dict):
-        latex(goal.get("formula"), "goal.formula")
-        text(goal.get("meaning"), "goal.meaning")
-    else:
-        found.append("goal must be an object with formula and meaning.")
-    if notes.get("example"):
-        text(notes["example"], "example")
-    for i, s in enumerate(items(notes.get("steps"), "steps"), 1):
-        text(s.get("title"), f"steps[{i}].title")
-        text(s.get("uses"), f"steps[{i}].uses")
-        latex(s.get("formula"), f"steps[{i}].formula")
-        latex(s.get("picture"), f"steps[{i}].picture", optional=True)
-        latex(s.get("expansion"), f"steps[{i}].expansion", optional=True)
-        if s.get("caption"):
-            text(s["caption"], f"steps[{i}].caption")
-        if s.get("figure") is not None:
-            found.extend(figures.problems(s["figure"], f"steps[{i}].figure"))
-            if s.get("picture"):
-                found.append(f"steps[{i}] has both picture and figure: keep one.")
-            for k, st in enumerate(s["figure"].get("states") or [] if isinstance(s["figure"], dict) else [], 1):
+
+    for i, g in enumerate(items(notes.get("given"), "given"), 1):
+        latex(g.get("symbol"), f"given[{i}].symbol")
+        latex(g.get("value"), f"given[{i}].value", optional=True)
+        text(g.get("meaning"), f"given[{i}].meaning")
+
+    find = obj(notes.get("find"), "find", ["formula", "meaning"])
+    if find:
+        latex(find.get("formula"), "find.formula")
+        text(find.get("meaning"), "find.meaning")
+
+    ids = []
+    for i, m in enumerate(items(notes.get("methods"), "methods"), 1):
+        mid = m.get("id")
+        if not isinstance(mid, str) or not _METHOD_ID.fullmatch(mid):
+            found.append(f"methods[{i}].id must be M1, M2, ... (got {mid!r}).")
+        elif mid in ids:
+            found.append(f"methods[{i}].id {mid} is used twice.")
+        else:
+            ids.append(mid)
+        text(m.get("name"), f"methods[{i}].name")
+        latex(m.get("formula"), f"methods[{i}].formula")
+        text(m.get("says"), f"methods[{i}].says")
+        text(m.get("why"), f"methods[{i}].why")
+
+    text(notes.get("plan"), "plan")
+
+    cited = set()
+    for i, b in enumerate(items(notes.get("solution"), "solution"), 1):
+        at = f"solution[{i}]"
+        text(b.get("title"), f"{at}.title")
+        if isinstance(b.get("title"), str) and re.match(r"\s*(step|part)\s*\d", b["title"], re.I):
+            found.append(f"{at}.title starts with a step number: name what the block works out instead, "
+                         f"e.g. Speed at the edge.")
+        uses = b.get("uses")
+        if not isinstance(uses, list) or not uses or not all(isinstance(u, str) for u in uses):
+            found.append(f"{at}.uses must list the methods it uses, e.g. [\"M1\"].")
+        else:
+            for u in uses:
+                if u not in ids:
+                    found.append(f"{at}.uses {u}, but there is no method {u}: add it to methods.")
+                cited.add(u)
+        latex(b.get("work"), f"{at}.work")
+        latex(b.get("expansion"), f"{at}.expansion", optional=True)
+        latex(b.get("result"), f"{at}.result")
+        text(b.get("explain"), f"{at}.explain")
+        latex(b.get("picture"), f"{at}.picture", optional=True)
+        if b.get("caption"):
+            text(b["caption"], f"{at}.caption")
+        if b.get("figure") is not None:
+            found.extend(figures.problems(b["figure"], f"{at}.figure"))
+            if b.get("picture"):
+                found.append(f"{at} has both picture and figure: keep one.")
+            states = b["figure"].get("states") if isinstance(b["figure"], dict) else None
+            for k, st in enumerate(states or [], 1):
                 if isinstance(st, dict) and isinstance(st.get("note"), str):
-                    text(st["note"], f"steps[{i}].figure.states[{k}].note")
-        text(s.get("meaning"), f"steps[{i}].meaning")
-    solution = notes.get("solution")
-    if isinstance(solution, dict):
-        if solution.get("intro"):
-            text(solution["intro"], "solution.intro")
-        for i, s in enumerate(items(solution.get("steps"), "solution.steps"), 1):
-            text(s.get("text"), f"solution.steps[{i}].text")
-            latex(s.get("formula"), f"solution.steps[{i}].formula", optional=True)
-        text(solution.get("key_idea"), "solution.key_idea")
-        if solution.get("watch_out"):
-            text(solution["watch_out"], "solution.watch_out")
-    else:
-        found.append("solution must be an object with steps and key_idea.")
+                    text(st["note"], f"{at}.figure.states[{k}].note")
+    for mid in ids:
+        if mid not in cited:
+            found.append(f"{mid} is never used in the solution: use it in a block's uses, or leave it out.")
+
+    for i, c in enumerate(notes.get("checks") or [], 1):
+        text(c, f"checks[{i}]")
+
     if notes.get("options"):
         rows = items(notes["options"], "options", minimum=2)
         for i, o in enumerate(rows, 1):
@@ -267,13 +334,71 @@ def problems(notes: dict) -> list[str]:
                 found.append(f"options[{i}].correct must be true or false.")
         if rows and sum(o.get("correct") is True for o in rows) != 1:
             found.append("options must mark exactly one option as correct.")
-    latex(notes.get("answer"), "answer", optional=True)
+
+    take = obj(notes.get("takeaways"), "takeaways", ["key_idea", "mistakes"])
+    if take:
+        text(take.get("key_idea"), "takeaways.key_idea")
+        mistakes = take.get("mistakes")
+        if not isinstance(mistakes, list) or not mistakes:
+            found.append("takeaways.mistakes must list at least one common mistake.")
+        else:
+            for i, m in enumerate(mistakes, 1):
+                text(m, f"takeaways.mistakes[{i}]")
+
+    for i, e in enumerate(items(notes.get("exam"), "exam"), 1):
+        text(e.get("text"), f"exam[{i}].text")
+        latex(e.get("formula"), f"exam[{i}].formula", optional=True)
+
     if highlights[0] > MAX_HIGHLIGHTS:
         found.append(f"\\hl is used {highlights[0]} times. Highlight at most {MAX_HIGHLIGHTS} key results, so they stand out.")
     explained = {c.get("color") for c in notes.get("colors", []) if isinstance(c, dict)}
     for name in sorted(used - explained):
         found.append(f"\\{name} is used, but colors doesn't say what {name} stands for. Add it, or don't use it.")
     return found
+
+
+def is_old(notes) -> bool:
+    """Notes in the earlier format: have, goal and steps instead of given, find and methods."""
+    return isinstance(notes, dict) and "steps" in notes and "methods" not in notes
+
+
+def upgrade(notes: dict) -> dict:
+    """Notes in the earlier format, rewritten in today's, so clipped notes keep opening.
+
+    The old facts (have) become methods, the old steps become solution blocks, and the old
+    complete solution becomes the exam version. Fields the old format didn't have stay empty.
+    """
+    if not is_old(notes):
+        return notes
+    old_sol = notes.get("solution") or {}
+    methods = [{"id": f"M{i}", "name": f"({h.get('label', i)})", "formula": h.get("formula", ""),
+                "says": h.get("meaning", ""), "why": ""} for i, h in enumerate(notes.get("have") or [], 1)]
+    blocks = []
+    for s in notes.get("steps") or []:
+        block = {"title": s.get("title", ""), "uses": [], "uses_text": s.get("uses", ""),
+                 "work": s.get("formula", ""), "result": "", "explain": s.get("meaning", "")}
+        for key in ("expansion", "picture", "figure", "caption"):
+            if s.get(key):
+                block[key] = s[key]
+        blocks.append(block)
+    exam = ([{"text": old_sol["intro"]}] if old_sol.get("intro") else []) + list(old_sol.get("steps") or [])
+    new = {
+        "title": notes.get("title", ""),
+        "asked": notes.get("asked", ""),
+        "answer": {"result": notes.get("answer", ""), "text": notes.get("short_answer") or old_sol.get("key_idea", "")},
+        "colors": notes.get("colors", []),
+        "given": [],
+        "find": notes.get("goal") or {"formula": "", "meaning": ""},
+        "methods": methods,
+        "plan": notes.get("example", ""),
+        "solution": blocks,
+        "takeaways": {"key_idea": old_sol.get("key_idea", ""),
+                      "mistakes": [old_sol["watch_out"]] if old_sol.get("watch_out") else []},
+        "exam": exam,
+    }
+    if notes.get("options"):
+        new["options"] = notes["options"]
+    return new
 
 
 # ---- LaTeX export -------------------------------------------------------------------------
@@ -314,6 +439,7 @@ def _tex_text(value: str) -> str:
 
 def to_tex(notes: dict) -> str:
     """The notes as a standalone LaTeX document, laid out like the Notepad, colours included."""
+    notes = upgrade(notes)
     t = _tex_text
     lines = [
         r"\documentclass[11pt]{article}",
@@ -337,49 +463,53 @@ def to_tex(notes: dict) -> str:
         r"\date{}",
         r"\begin{document}",
         r"\maketitle",
-        rf"\textbf{{Question.}} {t(notes['asked'])}",
+        rf"\textbf{{Problem.}} {t(notes['asked'])}",
     ]
-    if notes.get("short_answer"):
-        lines.append(rf"\textbf{{Short answer.}} {t(notes['short_answer'])}")
+    answer = notes.get("answer") or {}
+    if answer.get("result"):
+        lines.append(rf"\textbf{{Answer.}} $\displaystyle {answer['result']}$")
+    if answer.get("text"):
+        lines.append(t(answer["text"]))
     if notes.get("colors"):
         lines.append(r"\textbf{Colours.} " + "; ".join(
             rf"$\{c['color']}{{\blacksquare}}$ {t(c['meaning'])}" for c in notes["colors"]) + ".")
-    lines.append(r"\section*{Given}")
-    lines.append(r"\begin{description}")
-    for h in notes["have"]:
-        lines.append(rf"\item[({t(h['label'])})] $\displaystyle {h['formula']}$\\ {t(h['meaning'])}")
-    lines.append(rf"\item[To show.] $\displaystyle {notes['goal']['formula']}$\\ {t(notes['goal']['meaning'])}")
-    lines.append(r"\end{description}")
+    if notes.get("given"):
+        lines.append(r"\section*{Given}")
+        lines.append(r"\begin{itemize}")
+        for g in notes["given"]:
+            value = rf" = {g['value']}" if g.get("value") else ""
+            lines.append(rf"\item $\displaystyle {g['symbol']}{value}$: {t(g['meaning'])}")
+        lines.append(r"\end{itemize}")
+    find = notes.get("find") or {}
+    if find.get("formula"):
+        lines.append(rf"\textbf{{Find.}} $\displaystyle {find['formula']}$. {t(find.get('meaning', ''))}")
+    lines.append(r"\section*{Methods}")
+    for m in notes["methods"]:
+        lines.append(rf"\textbf{{{t(m['id'])} {t(m['name'])}.}} \[ {m['formula']} \]")
+        lines.append(t(m["says"]) + (rf" \emph{{Why here:}} {t(m['why'])}" if m.get("why") else ""))
+    if notes.get("plan"):
+        lines.append(rf"\textbf{{Plan.}} {t(notes['plan'])}")
     lines.append(r"\section*{Solution}")
-    if notes.get("example"):
-        lines.append(t(notes["example"]))
     figure = 0
-    for i, s in enumerate(notes["steps"], 1):
-        lines.append(rf"\subsection*{{Step {i}.\quad {t(s['title'])}}}")
-        lines.append(rf"\emph{{Uses {t(s['uses'])}.}}")
-        lines.append(rf"\[ {s['formula']} \]")
-        if s.get("expansion"):
-            lines.append(rf"\[ {s['expansion']} \]")
-        if s.get("figure"):
+    for b in notes["solution"]:
+        uses = ", ".join(b.get("uses") or []) or b.get("uses_text", "")
+        lines.append(rf"\subsection*{{{t(b['title'])}}}")
+        if uses:
+            lines.append(rf"\emph{{Uses {t(uses)}.}}")
+        lines.append(rf"\[ {b['work']} \]")
+        if b.get("expansion"):
+            lines.append(rf"\[ {b['expansion']} \]")
+        if b.get("figure") or b.get("picture"):
             figure += 1
-            caption = rf" {t(s['caption'])}" if s.get("caption") else ""
-            lines.append(rf"\begin{{center}}{_figure_tex(s['figure'])}\\[4pt] \small\textbf{{Figure {figure}.}}{caption}\end{{center}}")
-        elif s.get("picture"):
-            figure += 1
-            caption = rf" {t(s['caption'])}" if s.get("caption") else ""
-            lines.append(rf"\begin{{center}}$\displaystyle {s['picture']}$\\[4pt] \small\textbf{{Figure {figure}.}}{caption}\end{{center}}")
-        lines.append(t(s["meaning"]))
-    sol = notes["solution"]
-    lines.append(r"\section*{Write-up}")
-    if sol.get("intro"):
-        lines.append(t(sol["intro"]))
-    lines.append(r"\begin{enumerate}")
-    for s in sol["steps"]:
-        lines.append(rf"\item {t(s['text'])}" + (rf" \[ {s['formula']} \]" if s.get("formula") else ""))
-    lines.append(r"\end{enumerate}")
-    lines.append(rf"\textbf{{Key idea.}} {t(sol['key_idea'])}")
-    if sol.get("watch_out"):
-        lines.append("\n" + rf"\textbf{{Watch out.}} {t(sol['watch_out'])}")
+            caption = rf" {t(b['caption'])}" if b.get("caption") else ""
+            body = _figure_tex(b["figure"]) if b.get("figure") else rf"$\displaystyle {b['picture']}$"
+            lines.append(rf"\begin{{center}}{body}\\[4pt] \small\textbf{{Figure {figure}.}}{caption}\end{{center}}")
+        lines.append(t(b["explain"]))
+        if b.get("result"):
+            lines.append(rf"\textbf{{Result:}} $\displaystyle {b['result']}$")
+    if notes.get("checks"):
+        lines.append(r"\section*{Checks}")
+        lines.append(r"\begin{itemize}" + "".join(rf"\item {t(c)}" for c in notes["checks"]) + r"\end{itemize}")
     if notes.get("options"):
         lines.append(r"\section*{Every option}")
         lines.append(r"\begin{tabular}{lllp{6.5cm}}\toprule Option & Computes & Value & Verdict \\ \midrule")
@@ -387,9 +517,18 @@ def to_tex(notes: dict) -> str:
             mark = r"$\green{\checkmark}$" if o.get("correct") else ""
             lines.append(rf"{t(o['option'])} {mark} & ${o['computes']}$ & {t(o.get('value', ''))} & {t(o['verdict'])} \\")
         lines.append(r"\bottomrule\end{tabular}")
-    if notes.get("answer"):
-        lines.append(r"\section*{Answer}")
-        lines.append(rf"\[ {notes['answer']} \]")
+    take = notes.get("takeaways") or {}
+    lines.append(r"\section*{Takeaways}")
+    if take.get("key_idea"):
+        lines.append(rf"\textbf{{Key idea.}} {t(take['key_idea'])}")
+    if take.get("mistakes"):
+        lines.append(r"\textbf{Common mistakes.}\begin{itemize}" + "".join(rf"\item {t(m)}" for m in take["mistakes"]) + r"\end{itemize}")
+    if notes.get("exam"):
+        lines.append(r"\section*{Exam version}")
+        lines.append(r"\begin{enumerate}")
+        for e in notes["exam"]:
+            lines.append(rf"\item {t(e['text'])}" + (rf" \[ {e['formula']} \]" if e.get("formula") else ""))
+        lines.append(r"\end{enumerate}")
     lines.append(r"\end{document}")
     return "\n".join(lines) + "\n"
 
