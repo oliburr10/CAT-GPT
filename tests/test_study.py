@@ -8,7 +8,7 @@ import pytest
 from catagent import examples, study, tools
 
 
-@pytest.mark.parametrize("notes", [examples.TRACE_NOTES, examples.PURITY_NOTES])
+@pytest.mark.parametrize("notes", [examples.TRACE_NOTES, examples.PURITY_NOTES, examples.RIBO_NOTES])
 def test_example_notes_are_valid(notes):
     assert study.problems(notes) == []
 
@@ -80,7 +80,7 @@ def test_tex_export_escapes_text_but_not_math():
 
 
 @pytest.mark.skipif(not shutil.which("pdflatex"), reason="pdflatex isn't installed")
-@pytest.mark.parametrize("example", ["TRACE_NOTES", "PURITY_NOTES"])
+@pytest.mark.parametrize("example", ["TRACE_NOTES", "PURITY_NOTES", "RIBO_NOTES"])
 def test_tex_export_compiles(tmp_path, example):
     notes = copy.deepcopy(getattr(examples, example))
     notes["asked"] = "Prove that for A ∈ ℝ^{n×m} and B ∈ ℝ^{m×n}, Trace(AB) = Trace(BA) ≥ 0? (α, Σ, ∎) 50% & #1"

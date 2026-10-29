@@ -14,11 +14,11 @@ from pathlib import Path
 from PySide6.QtCore import QObject, QUrl, Signal, Slot
 from PySide6.QtGui import QDesktopServices
 from PySide6.QtWebChannel import QWebChannel
-from PySide6.QtWebEngineCore import QWebEnginePage
+from PySide6.QtWebEngineCore import QWebEnginePage, QWebEngineSettings
 from PySide6.QtWebEngineWidgets import QWebEngineView
 from PySide6.QtWidgets import QApplication, QFileDialog, QVBoxLayout, QWidget
 
-from . import clipboard, config, context, study
+from . import clipboard, config, context, figures, study
 from .clipboard import ClipboardError
 
 PAGE = Path(__file__).parent / "web" / "notepad.html"
@@ -159,6 +159,10 @@ class Notepad(QWidget):
 
         self.view = QWebEngineView(self)
         self.view.setPage(_Page(self.view))
+        # 3D figures download their structure from the Protein Data Bank (RCSB).
+        settings = self.view.page().settings()
+        settings.setAttribute(QWebEngineSettings.WebAttribute.LocalContentCanAccessFileUrls, True)
+        settings.setAttribute(QWebEngineSettings.WebAttribute.LocalContentCanAccessRemoteUrls, True)
         self.bridge = NotepadBridge(self)
         self.channel = QWebChannel(self.view.page())
         self.channel.registerObject("bridge", self.bridge)
@@ -206,6 +210,7 @@ class Notepad(QWidget):
 
     def show_notes(self, notes: dict) -> None:
         """New notes from the cat. They replace what's open; clipped notes stay safe in their files."""
+        notes = figures.add_energies(notes)   # each RNA fold's free energy, if ViennaRNA is installed
         self.current = {"id": uuid.uuid4().hex, "kind": "solution", "title": notes["title"], "notes": notes}
         self.current_path = None
         self.from_disk = False
@@ -348,9 +353,11 @@ class Notepad(QWidget):
 
 
 def main() -> int:
-    """`python -m catagent.notepad`: just the Notepad, opened on the example notes if nothing is open.
+    """`python -m catagent.notepad [trace|purity|ribo]`: just the Notepad, on example notes.
 
-    Handy for trying the clipboard. To ask Ginger for new notes, run the whole app (python run.py).
+    With no argument it opens the trace example if nothing is open yet; with one, it opens that
+    example (ribo has the RNA fold and 3D molecule figures). To ask Ginger for new notes, run the
+    whole app (python run.py).
     """
     import sys
 
@@ -359,7 +366,10 @@ def main() -> int:
     app = QApplication(sys.argv)
     app.setApplicationName(config.CAT_NAME)
     notepad = Notepad()
-    if notepad.current is None:
+    chosen = {"trace": examples.TRACE_NOTES, "purity": examples.PURITY_NOTES, "ribo": examples.RIBO_NOTES}
+    if len(sys.argv) > 1 and sys.argv[1] in chosen:
+        notepad.show_notes(chosen[sys.argv[1]])
+    elif notepad.current is None:
         notepad.show_notes(examples.TRACE_NOTES)
     notepad.asked.connect(lambda text: notepad.set_reply(
         "I'm not running yet. Start me with python run.py, then ask again from here."))

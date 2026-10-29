@@ -195,3 +195,117 @@ PURITY_NOTES = {
     ],
     "answer": r"\text{B}:\quad \Delta = I(r) - \tfrac12 I(v_1) - \tfrac12 I(v_2) \approx 0.047",
 }
+
+
+# Notes with figures the Notepad draws itself: a real 3D riboswitch, and a model riboswitch that
+# refolds. The model is the 4FEO aptamer (PDB numbering 15-81 becomes 1-67 here) followed by a
+# designed expression platform: the anti-SD (64-71) overlaps P1's 3' strand, then SD and AUG.
+_APTAMER = "GGACAUAUAAACGCGUGGAUAUGGCACGCGAGUUUCUACCGGGCACCGUAAAUGUCCGAUUAUGUCC"
+_RIBO_SEQ = _APTAMER + "UCCU" + "AAUAAUA" + "AGGAGGAC" + "UUAAAAUG" + "GCUAAAGAA"
+_APTAMER_FOLD = "(((((((....((((((.......)))))).........((((((.......))))))..)))))))"   # P1, P2, P3
+_RIBO_ON = _APTAMER_FOLD + "." * 36                                                    # SD free
+_RIBO_OFF = "." * 7 + _APTAMER_FOLD[7:60] + "..." + "(" * 8 + "." * 7 + ")" * 8 + "." * 17   # P1 open, anti-SD:SD
+
+RIBO_NOTES = {
+    "title": "Translational sequestering",
+    "asked": "Explain translational sequestering by riboswitches. What do the sequestor and antisequestor do, "
+             "and how can a metabolite switch translation on or off?",
+    "short_answer": r"The riboswitch can hide the ribosome binding site ($\orange{\text{SD}}$) in a hairpin, the "
+                    r"sequestor. A $\green{\text{switch}}$ stretch can pair either with the SD or with the aptamer, "
+                    r"never both, and the ligand decides which by holding the aptamer closed.",
+    "colors": [
+        {"color": "orange", "meaning": "the ribosome binding site (SD) and start codon"},
+        {"color": "green", "meaning": "the switch: P1's 3' strand, which can also pair with the SD"},
+        {"color": "blue", "meaning": "P1's 5' strand"},
+        {"color": "red", "meaning": "the bases that hold the ligand"},
+    ],
+    "have": [
+        {"label": "T1", "formula": r"\text{riboswitch} = \text{aptamer} + \text{expression platform}",
+         "meaning": "A folded stretch of an mRNA's 5' end that binds a small molecule directly, with no protein. "
+                    "The aptamer binds; the expression platform changes what the ribosome sees."},
+        {"label": "T2", "formula": r"\text{30S} + \orange{\text{SD}} \;\longrightarrow\; \text{start at } \orange{\text{AUG}}",
+         "meaning": "Bacterial ribosomes find a gene by base-pairing with the Shine-Dalgarno sequence just before the start codon."},
+        {"label": "T3", "formula": r"\text{sequestor} = \green{\text{switch}} : \orange{\text{SD}}",
+         "meaning": "A hairpin that pairs the SD with a complementary stretch, so the ribosome can't reach it."},
+        {"label": "T4", "formula": r"\text{antisequestor} = \text{a helix that takes the } \green{\text{switch}} \text{ away}",
+         "meaning": "Any helix that uses the switch stretch stops the sequestor from forming, which frees the SD."},
+    ],
+    "goal": {"formula": r"\text{ligand} \;\Rightarrow\; \text{fold} \;\Rightarrow\; \text{translation ON or OFF}",
+             "meaning": "Understand how binding one small molecule decides whether the ribosome can start."},
+    "steps": [
+        {"title": "The aptamer is a pocket made of RNA",
+         "uses": "(T1)",
+         "formula": r"\text{P1} + \text{P2} + \text{P3} + \text{ligand} \;\longrightarrow\; \text{closed aptamer}",
+         "figure": {
+             "type": "molecule", "pdb": "4FEO",
+             "highlights": [
+                 {"chain": "B", "residues": "15-21", "color": "blue", "label": "P1, 5' strand"},
+                 {"chain": "B", "residues": "75-81", "color": "green", "label": "P1, 3' strand (switch)"},
+                 {"chain": "B", "residues": "22,47,51,74", "color": "red", "label": "pocket"},
+             ],
+             "ligand": {"name": "DAP", "resn": "6AP"},
+         },
+         "caption": "A real purine riboswitch aptamer (PDB 4FEO, the xpt-pbuX riboswitch of B. subtilis, "
+                    "mutated so it binds 2,6-diaminopurine, an adenine analogue). Drag it to turn it.",
+         "meaning": r"Three helices fold around the ligand, and four bases ($\red{\text{U22, U47, U51, U74}}$) hold it "
+                    r"by base pairing. The ligand also locks helix P1, so P1's 3' strand, the $\green{\text{switch}}$, "
+                    r"is busy as long as the ligand is bound."},
+        {"title": "One RNA, two folds",
+         "uses": "(T3), (T4) and step 1",
+         "formula": r"\underbrace{\green{\text{switch}} : \orange{\text{SD}}}_{\text{no ligand: OFF}} "
+                    r"\;\rightleftharpoons\; \underbrace{\blue{\text{P1}} : \green{\text{switch}}}_{\text{ligand bound: ON}}",
+         "figure": {
+             "type": "rna",
+             "sequence": _RIBO_SEQ,
+             "states": [
+                 {"name": "no ligand", "structure": _RIBO_OFF, "ligand": False,
+                  "note": "The switch pairs with the SD (the sequestor), so the ribosome can't bind: translation OFF."},
+                 {"name": "+ DAP", "structure": _RIBO_ON, "ligand": True,
+                  "note": "DAP closes P1, the switch is taken, and the SD is single-stranded: translation ON."},
+             ],
+             "regions": [
+                 {"name": "P1", "start": 1, "end": 7, "color": "blue"},
+                 {"name": "switch", "start": 61, "end": 71, "color": "green"},
+                 {"name": "SD", "start": 79, "end": 86, "color": "orange"},
+                 {"name": "AUG", "start": 92, "end": 94, "color": "orange"},
+             ],
+             "ligand": {"name": "DAP", "near": [8, 33, 37, 60]},
+         },
+         "caption": r"A model riboswitch: the aptamer from step 1 followed by a designed expression platform. "
+                    r"Pick a fold, or press Refold to watch it switch.",
+         "meaning": r"The same 103 bases can fold two ways, because the $\green{\text{switch}}$ can pair with only one "
+                    r"partner at a time. On its own the OFF fold is about $6$ kcal/mol more stable, so the SD stays hidden. "
+                    r"Binding the ligand pays for that difference, and the RNA refolds with the SD free."},
+        {"title": "The ribosome reads the result",
+         "uses": "(T2) and step 2",
+         "formula": r"\orange{\text{SD free}} \;\Rightarrow\; \text{30S binds} \;\Rightarrow\; \text{translation ON}",
+         "meaning": "Nothing chemical happens to the ribosome. It simply can't pair with an SD that is already paired, "
+                    "so the fold decides whether the protein is made. The mRNA itself is made either way."},
+        {"title": "ON switch or OFF switch",
+         "uses": "steps 2 and 3",
+         "formula": r"\text{ligand stabilises an } \text{anti}^{k}\text{sequestor} \;\Rightarrow\; "
+                    r"\begin{cases} k \text{ odd: ON} \\ k \text{ even: OFF} \end{cases}",
+         "picture": r"\begin{array}{l|c|c} & \text{no ligand} & \text{ligand bound} \\ \hline "
+                    r"\text{ON switch (here, adenine } \textit{add}\text{)} & \text{OFF} & \text{ON} \\ "
+                    r"\text{OFF switch (TPP } \textit{thiM}\text{, B}_{12}\ \textit{btuB}\text{)} & \text{ON} & \text{OFF} \end{array}",
+         "caption": "The same parts give either logic, depending on which helix the ligand stabilises.",
+         "meaning": "Here the aptamer is the antisequestor, so the ligand turns translation on. In an OFF switch the "
+                    "aptamer takes a stretch that would otherwise block the sequestor (an anti-antisequestor), so the "
+                    "ligand turns translation off: typical feedback for genes that make the ligand."},
+    ],
+    "solution": {
+        "steps": [
+            {"text": "Bacterial translation starts when the 30S subunit base-pairs with the Shine-Dalgarno sequence before the AUG."},
+            {"text": "In translational sequestering, the riboswitch's expression platform can fold the SD into a hairpin, "
+                     "the sequestor, so the ribosome can't bind."},
+            {"text": "The sequestor competes with other helices for the same bases. Binding the ligand stabilises the "
+                     "aptamer, and so decides which helix forms:",
+             "formula": r"\text{ligand} \Rightarrow \text{aptamer} \Rightarrow \text{fold} \Rightarrow \text{SD free (ON) or hidden (OFF)}."},
+            {"text": "If the aptamer is the antisequestor, the ligand turns the gene on; if it is the anti-antisequestor, off."},
+        ],
+        "key_idea": "A riboswitch is a set of base pairings that exclude each other, and the ligand picks one of them.",
+        "watch_out": "This controls translation, not transcription. Terminator and antiterminator riboswitches use the "
+                     "same logic, but there the hairpin stops RNA polymerase.",
+    },
+    "answer": r"\text{ligand} \;\Rightarrow\; \text{which helix forms} \;\Rightarrow\; \orange{\text{SD}} \text{ free (ON) or sequestered (OFF)}",
+}

@@ -153,6 +153,22 @@ same order:
 5. For multiple choice, **every option, checked**: what each one really computes, its value
    and why it's right or wrong. Then the **answer**.
 
+**Figures the Notepad draws itself.** Besides LaTeX pictures, a step can carry a figure the
+Notepad draws on the spot, so it's instant and you can play with it:
+
+- **RNA folds.** Ginger gives the sequence and one or more ways it folds (dot-bracket), with
+  coloured stretches and a ligand. The Notepad lays each fold out like a textbook drawing and
+  *refolds* it in front of you: a riboswitch visibly lets go of the Shine–Dalgarno sequence when
+  its ligand binds. Every base pair is checked (A–U, G–C, G–U only) before the notes are shown,
+  and with [ViennaRNA](https://www.tbi.univie.ac.at/RNA/) installed (`pip install ViennaRNA`)
+  each fold gets its free energy, so you see *why* one fold wins.
+- **3D molecules.** Ginger names a structure from the Protein Data Bank (say 4FEO, a riboswitch
+  holding its ligand) and which residues to colour. The Notepad downloads it from RCSB and shows
+  it with [3Dmol.js](https://3dmol.org): drag to turn it, jump to the binding pocket, or let it
+  spin. This needs an internet connection the first time.
+
+Try them without a model: `python -m catagent.notepad ribo`.
+
 Colour is ink, one colour per idea (say, entries of *A* in orange, *B* in blue, the diagonal
 in green), the same in formulas, figures and text. A yellow highlighter marks at most three
 key results, so they stand out.

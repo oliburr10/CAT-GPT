@@ -226,6 +226,7 @@ function renderNotes() {
   const root = document.getElementById("notes");
   const current = S.current;
   if (!current) {
+    root.dataset.noteId = "";
     root.replaceChildren(h("div", { class: "empty" },
       S.asking ? h("span", { class: "writing", "aria-label": S.catName + " is writing" }, h("i"), h("i"), h("i")) : null,
       h("h1", {}, S.asking ? S.catName + " is writing your notes" : "Your study notes go here"),
@@ -235,12 +236,21 @@ function renderNotes() {
     return;
   }
   if (current.kind !== "solution") {
+    root.dataset.noteId = "";
     root.replaceChildren(h("div", { class: "note-card" },
       h("span", { class: "kind" }, kindIcon(current.kind), KIND_NAMES[current.kind]),
       prose(current.title, "h1"),
       current.text && current.text !== current.title ? prose(current.text, "div", "text") : null));
     return;
   }
+  // Rebuild only when different notes open. Interactive figures (a 3D view you've turned, an
+  // RNA mid-refold) survive everything else; only the clip status is refreshed.
+  if (root.dataset.noteId === current.id) {
+    const slot = root.querySelector(".clip-slot");
+    if (slot) slot.replaceChildren(clipStatus("pill"));
+    return;
+  }
+  root.dataset.noteId = current.id;
   const n = current.notes;
   let figures = 0;
 
@@ -262,13 +272,20 @@ function renderNotes() {
   // Each step is one board: the derivation, with its figure beside it when there is one.
   const steps = n.steps.map((s, i) => {
     let figure = null;
-    if (s.picture) {
+    if (s.figure) {
+      figures += 1;
+      const drawn = h("div", { class: "drawn" });
+      Figures.render(drawn, s.figure, { colors: COLORS });
+      figure = h("figure", { class: "figure" }, drawn,
+        h("figcaption", {}, h("b", {}, "Figure " + figures + ". "), s.caption ? prose(s.caption) : null));
+    } else if (s.picture) {
       figures += 1;
       figure = h("figure", { class: "figure" },
         formula(s.picture, "figure-math"),
         h("figcaption", {}, h("b", {}, "Figure " + figures + ". "), s.caption ? prose(s.caption) : null));
     }
-    return h("section", { class: "board" + (figure ? " has-figure" : "") },
+    // Figures the Notepad draws (a fold, a 3D molecule) get the full width, under the derivation.
+    return h("section", { class: "board" + (figure ? " has-figure" : "") + (s.figure ? " stacked" : "") },
       h("div", { class: "derivation" },
         h("span", { class: "step-no" }, "Step " + (i + 1)),
         prose(s.title, "h3"),
@@ -293,7 +310,7 @@ function renderNotes() {
         h("td", { class: "num" }, o.value || "–"),
         h("td", {}, prose(o.verdict)))))))) : null;
 
-  root.replaceChildren(
+  root.replaceChildren(...[
     h("header", { class: "doc-head" },
       h("span", { class: "kicker" }, "Worked solution"),
       prose(n.title, "h1"),
@@ -306,14 +323,14 @@ function renderNotes() {
       n.example ? prose(n.example, "p", "lead") : null,
       h("div", { class: "boards" }, steps)),
     h("section", { class: "section writeup-box" },
-      h("div", { class: "head" }, h("h2", {}, "Write-up"), clipStatus("pill")),
+      h("div", { class: "head" }, h("h2", {}, "Write-up"), h("span", { class: "clip-slot" }, clipStatus("pill"))),
       sol.intro ? prose(sol.intro, "p") : null,
       writeup,
       h("p", { class: "remark" }, h("b", {}, "Key idea. "), prose(sol.key_idea)),
       sol.watch_out ? h("p", { class: "remark" }, h("b", {}, "Watch out. "), prose(sol.watch_out)) : null),
     options,
     n.answer ? h("section", { class: "final" }, h("span", { class: "label" }, "Answer"), formula(n.answer, "answer-math")) : null,
-  );
+  ].filter(Boolean));
   requestAnimationFrame(fitFigures);
 }
 

@@ -16,17 +16,9 @@ The Notepad (KaTeX) and the .tex export define them the same way.
 
 import re
 
-# Ink colours, dark enough to read as text on white.
-COLORS = {
-    "blue": "2F6FDB",
-    "orange": "C9760F",
-    "green": "1E8A50",
-    "purple": "7A4FD0",
-    "red": "C23B32",
-}
-# Notes clipped before the colours were inks used these names; they still render.
-OLD_COLORS = {"beige": "orange", "pink": "red"}
-HIGHLIGHT = "FFE58F"
+from . import figures
+from .palette import COLORS, HIGHLIGHT, OLD_COLORS
+
 MAX_HIGHLIGHTS = 3
 
 _TEXT = {"type": "string"}
@@ -76,6 +68,7 @@ SCHEMA = {
                     "uses": {"type": "string", "description": "Which facts or steps it uses, e.g. (D3) with k = i."},
                     "formula": _LATEX,
                     "picture": {"type": "string", "description": "Optional LaTeX figure, e.g. coloured matrices or a table."},
+                    "figure": figures.SCHEMA,
                     "caption": {"type": "string", "description": "Optional: one sentence under the figure."},
                     "expansion": {"type": "string", "description": "Optional LaTeX: the formula written out for the example."},
                     "meaning": _TEXT,
@@ -133,8 +126,16 @@ with a plain-words meaning. The goal goes only in goal, not in have.
 - Solve it step by step. Each step is one move: a formula that follows from the facts or earlier \
 steps (say which in uses), the example written out in expansion, and what it means in plain words. \
 Prefer a few clear steps over many tiny ones. Line derivations up with \\begin{{aligned}} ... &= ... \\end{{aligned}}.
-- Use one small concrete example and continue the same figure (picture) through the steps, e.g. \
-coloured matrices in a bmatrix or a small table, each with a one-sentence caption.
+- Use one small concrete example and continue the same figure through the steps, each with a \
+one-sentence caption. A figure is either picture (LaTeX: coloured matrices, a small table) or \
+figure, which the Notepad draws itself:
+  - figure type rna, for anything about RNA folding (riboswitches, attenuators, hairpins, \
+tRNA): the sequence, one or more folds in dot-bracket (each with a name, a note and whether the \
+ligand is bound), coloured regions (e.g. the SD in orange) and the ligand with the bases around \
+its pocket. The Notepad animates between the folds. Pairs must be A-U, G-C or G-U; design a short \
+model sequence if you don't know a real one, and say so in the caption.
+  - figure type molecule, for a real 3D structure: a PDB ID you are certain of, residues to \
+highlight with labels, and the ligand's residue name. Never guess a PDB ID.
 - Colour is ink, used for ideas: pick one colour per idea (say what each means in colors) and use \
 it for that idea everywhere, in formulas, figures and text: \\blue{{...}}, \\orange{{...}}, \
 \\green{{...}}, \\purple{{...}}, \\red{{...}}. In text, colour inside math, e.g. $\\orange{{\\text{{row }} i}}$.
@@ -236,6 +237,13 @@ def problems(notes: dict) -> list[str]:
         latex(s.get("expansion"), f"steps[{i}].expansion", optional=True)
         if s.get("caption"):
             text(s["caption"], f"steps[{i}].caption")
+        if s.get("figure") is not None:
+            found.extend(figures.problems(s["figure"], f"steps[{i}].figure"))
+            if s.get("picture"):
+                found.append(f"steps[{i}] has both picture and figure: keep one.")
+            for k, st in enumerate(s["figure"].get("states") or [] if isinstance(s["figure"], dict) else [], 1):
+                if isinstance(st, dict) and isinstance(st.get("note"), str):
+                    text(st["note"], f"steps[{i}].figure.states[{k}].note")
         text(s.get("meaning"), f"steps[{i}].meaning")
     solution = notes.get("solution")
     if isinstance(solution, dict):
@@ -352,7 +360,11 @@ def to_tex(notes: dict) -> str:
         lines.append(rf"\[ {s['formula']} \]")
         if s.get("expansion"):
             lines.append(rf"\[ {s['expansion']} \]")
-        if s.get("picture"):
+        if s.get("figure"):
+            figure += 1
+            caption = rf" {t(s['caption'])}" if s.get("caption") else ""
+            lines.append(rf"\begin{{center}}{_figure_tex(s['figure'])}\\[4pt] \small\textbf{{Figure {figure}.}}{caption}\end{{center}}")
+        elif s.get("picture"):
             figure += 1
             caption = rf" {t(s['caption'])}" if s.get("caption") else ""
             lines.append(rf"\begin{{center}}$\displaystyle {s['picture']}$\\[4pt] \small\textbf{{Figure {figure}.}}{caption}\end{{center}}")
@@ -380,3 +392,14 @@ def to_tex(notes: dict) -> str:
         lines.append(rf"\[ {notes['answer']} \]")
     lines.append(r"\end{document}")
     return "\n".join(lines) + "\n"
+
+
+def _figure_tex(fig: dict) -> str:
+    """A figure the Notepad draws, for the .tex export: the folds as text, or where to find the structure."""
+    if fig.get("type") == "rna":
+        rows = [rf"\texttt{{{fig['sequence']}}}"]
+        for st in fig["states"]:
+            energy = rf" ($\Delta G = {st['energy']}$ kcal/mol)" if "energy" in st else ""
+            rows.append(rf"\texttt{{{st['structure']}}}\quad {_tex_text(st['name'])}{energy}")
+        return r"{\footnotesize " + r"\\ ".join(rows) + "}"
+    return rf"3D structure: PDB \texttt{{{fig['pdb']}}}. Open the notes in the Notepad to turn it around."
