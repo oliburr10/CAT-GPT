@@ -135,9 +135,10 @@ def build_server(
 
     @tool(
         "write_study_notes",
-        "Write study notes that teach how to solve a problem and open them in the Notepad: what "
-        "you have (formulas with meanings), the solution step by step (each step a formula, an "
-        "optional colour-coded picture, and what it means), and the complete solution in one box. "
+        "Write study notes that teach how to solve a problem and open them in the Notepad, laid out "
+        "like a worked solution on a whiteboard: the question and a short answer, what is given, "
+        "the solution step by step (each a derivation with an optional figure and what it means), "
+        "the write-up, and for multiple choice every option checked. "
         "Use this whenever the user wants to understand, learn, solve or prove something.",
         study.SCHEMA,
     )

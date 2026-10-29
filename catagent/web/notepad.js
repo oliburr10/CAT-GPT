@@ -4,9 +4,13 @@
 
 "use strict";
 
-const COLORS = { beige: "FDE7D3", blue: "DCE8FB", green: "E3F2E7", purple: "EBE3FB", pink: "FBE3EC" };
-const MACROS = {};
-for (const [name, hex] of Object.entries(COLORS)) MACROS["\\" + name] = "\\colorbox{" + hex + "}{$#1$}";
+// Coloured ink for ideas, and a highlighter for the few results that matter (study.py has the same).
+const COLORS = { blue: "2F6FDB", orange: "C9760F", green: "1E8A50", purple: "7A4FD0", red: "C23B32" };
+const OLD_COLORS = { beige: "orange", pink: "red" };   // clips saved before the colours were inks
+const MACROS = { "\\hl": "\\htmlClass{hl}{#1}" };
+for (const [name, hex] of Object.entries(COLORS)) MACROS["\\" + name] = "\\textcolor{" + hex + "}{#1}";  // no "#": it would read as an argument
+for (const [old, name] of Object.entries(OLD_COLORS)) MACROS["\\" + old] = MACROS["\\" + name];
+const KATEX = { throwOnError: false, strict: false, trust: (c) => c.command === "\\htmlClass" };
 const KIND_NAMES = { solution: "Solution", note: "Study note", idea: "Idea" };
 const SUGGEST_TOP = ["Week 1", "Week 2", "Exams", "Assignments", "Projects"];
 const SUGGEST_SUB = ["Questions", "Lectures", "Assignments", "Exams", "Projects"];
@@ -63,7 +67,7 @@ function kindIcon(kind) {
 function formula(latex, cls) {
   const el = h("div", { class: cls || "formula" });
   try {
-    katex.render(latex, el, { displayMode: true, throwOnError: false, macros: { ...MACROS } });
+    katex.render(latex, el, { ...KATEX, displayMode: true, macros: { ...MACROS } });
   } catch (e) {
     el.textContent = latex;
   }
@@ -81,8 +85,8 @@ function prose(text, tag, cls) {
         { left: "\\[", right: "\\]", display: true },
         { left: "$", right: "$", display: false },
       ],
+      ...KATEX,
       macros: { ...MACROS },
-      throwOnError: false,
     });
   }
   return el;
@@ -238,52 +242,114 @@ function renderNotes() {
     return;
   }
   const n = current.notes;
-  const colorChips = (n.colors || []).map((c) => prose(c.meaning, "span")).map((el, i) => {
-    el.style.background = "#" + (COLORS[n.colors[i].color] || "F5F5F7");
+  let figures = 0;
+
+  // The colours, written in their own ink: "class 1 · class 2 · the gain".
+  const legend = (n.colors || []).map((c) => {
+    const el = prose(c.meaning, "span");
+    el.style.color = "#" + (COLORS[OLD_COLORS[c.color] || c.color] || "1D1D1F");
     return el;
   });
 
-  const have = h("div", { class: "have" },
-    n.have.map((row) => h("div", { class: "have-row" },
+  const given = h("div", { class: "given" },
+    n.have.map((row) => h("div", { class: "fact" },
       h("span", { class: "tag" }, "(" + row.label.replace(/^\(|\)$/g, "") + ")"),
-      h("div", { class: "body-col" }, formula(row.formula), prose(row.meaning, "div", "meaning")))),
-    h("div", { class: "have-row goal" },
-      h("span", { class: "tag" }, "Goal"),
-      h("div", { class: "body-col" }, formula(n.goal.formula), prose(n.goal.meaning, "div", "meaning"))));
+      h("div", { class: "fact-body" }, formula(row.formula), prose(row.meaning, "p", "meaning")))),
+    h("div", { class: "fact goal" },
+      h("span", { class: "tag" }, "To show."),
+      h("div", { class: "fact-body" }, formula(n.goal.formula), prose(n.goal.meaning, "p", "meaning"))));
 
-  const steps = n.steps.map((s, i) => h("div", { class: "step" },
-    h("div", { class: "rail" }, h("span", { class: "num" }, String(i + 1)), h("span", { class: "line" })),
-    h("div", { class: "content" },
-      h("div", { class: "head" }, prose(s.title, "h3"), prose("uses " + s.uses, "span", "uses")),
-      formula(s.formula, "display"),
-      s.picture ? formula(s.picture, "picture") : null,
-      s.expansion ? formula(s.expansion, "expansion") : null,
-      h("div", { class: "what" }, h("b", {}, "What it means: "), prose(s.meaning)))));
+  // Each step is one board: the derivation, with its figure beside it when there is one.
+  const steps = n.steps.map((s, i) => {
+    let figure = null;
+    if (s.picture) {
+      figures += 1;
+      figure = h("figure", { class: "figure" },
+        formula(s.picture, "figure-math"),
+        h("figcaption", {}, h("b", {}, "Figure " + figures + ". "), s.caption ? prose(s.caption) : null));
+    }
+    return h("section", { class: "board" + (figure ? " has-figure" : "") },
+      h("div", { class: "derivation" },
+        h("span", { class: "step-no" }, "Step " + (i + 1)),
+        prose(s.title, "h3"),
+        prose("Uses " + s.uses + ".", "p", "uses"),
+        formula(s.formula, "display"),
+        s.expansion ? formula(s.expansion, "expansion") : null,
+        prose(s.meaning, "p", "what")),
+      figure);
+  });
 
   const sol = n.solution;
-  const proof = h("div", { class: "proof" }, sol.steps.map((s, i) => [
-    h("span", { class: "n" }, (i + 1) + "."),
-    h("div", {}, prose(s.text), s.formula ? formula(s.formula) : null),
-  ]));
+  const writeup = h("ol", { class: "writeup" }, sol.steps.map((s) =>
+    h("li", {}, prose(s.text, "p"), s.formula ? formula(s.formula, "writeup-math") : null)));
+
+  const options = (n.options || []).length ? h("section", { class: "section" },
+    h("h2", {}, "Every option, checked"),
+    h("div", { class: "table-wrap" }, h("table", {},
+      h("thead", {}, h("tr", {}, h("th", {}, "Option"), h("th", {}, "What it computes"), h("th", {}, "Value"), h("th", {}, "Verdict"))),
+      h("tbody", {}, n.options.map((o) => h("tr", { class: o.correct ? "right" : null },
+        h("td", { class: "letter" }, o.option, o.correct ? icon("check") : null),
+        h("td", {}, inline(o.computes)),
+        h("td", { class: "num" }, o.value || "–"),
+        h("td", {}, prose(o.verdict)))))))) : null;
 
   root.replaceChildren(
-    h("div", { class: "asked" }, h("span", { class: "label" }, "You asked"), prose(n.asked, "span", "text")),
-    h("div", {},
+    h("header", { class: "doc-head" },
+      h("span", { class: "kicker" }, "Worked solution"),
       prose(n.title, "h1"),
-      colorChips.length ? h("div", { class: "legend" }, colorChips) : null),
-    h("section", { class: "section" }, h("h2", {}, "1 What you have"), have),
+      legend.length ? h("div", { class: "legend" }, legend) : null),
+    h("section", { class: "problem" }, h("span", { class: "label" }, "Question"), prose(n.asked, "p", "asked")),
+    n.short_answer ? h("section", { class: "short" }, h("span", { class: "label" }, "Short answer"), prose(n.short_answer, "p")) : null,
+    h("section", { class: "section" }, h("h2", {}, "Given"), given),
     h("section", { class: "section" },
-      h("h2", {}, "2 Solve it step by step"),
+      h("h2", {}, "Solution"),
       n.example ? prose(n.example, "p", "lead") : null,
-      h("div", {}, steps)),
-    h("section", { class: "solution" },
-      h("div", { class: "head" }, h("h2", {}, "3 Complete solution"), clipStatus("pill")),
-      sol.intro ? prose(sol.intro, "div") : null,
-      proof,
-      h("div", { class: "takeaways" },
-        h("span", {}, h("b", {}, "Key idea: "), prose(sol.key_idea)),
-        sol.watch_out ? h("span", {}, h("b", {}, "Watch out: "), prose(sol.watch_out)) : null)),
+      h("div", { class: "boards" }, steps)),
+    h("section", { class: "section writeup-box" },
+      h("div", { class: "head" }, h("h2", {}, "Write-up"), clipStatus("pill")),
+      sol.intro ? prose(sol.intro, "p") : null,
+      writeup,
+      h("p", { class: "remark" }, h("b", {}, "Key idea. "), prose(sol.key_idea)),
+      sol.watch_out ? h("p", { class: "remark" }, h("b", {}, "Watch out. "), prose(sol.watch_out)) : null),
+    options,
+    n.answer ? h("section", { class: "final" }, h("span", { class: "label" }, "Answer"), formula(n.answer, "answer-math")) : null,
   );
+  requestAnimationFrame(fitFigures);
+}
+
+// A figure beside its derivation can be wider than its column (a matrix product, say). If it would
+// have to shrink below 80%, it moves under the derivation instead; whatever is still too wide
+// shrinks to fit, down to 60%, and only then scrolls.
+function fitFigures() {
+  for (const el of document.querySelectorAll(".figure-math")) {
+    const board = el.closest(".board");
+    board.classList.remove("stacked");
+    if (fit(el) < 0.8 && getComputedStyle(board).gridTemplateColumns.split(" ").length > 1) {
+      board.classList.add("stacked");
+      fit(el);
+    }
+  }
+}
+
+function fit(el) {
+  el.style.fontSize = "";
+  const base = parseFloat(getComputedStyle(el).fontSize);
+  const pad = 32;   // its left and right padding
+  const scale = Math.min(1, (el.clientWidth - pad) / (el.scrollWidth - pad));
+  if (scale < 1) el.style.fontSize = Math.max(0.6, scale) * base + "px";
+  return scale;
+}
+window.addEventListener("resize", () => requestAnimationFrame(fitFigures));
+
+// An inline formula, for table cells.
+function inline(latex) {
+  const el = h("span", { class: "inline-math" });
+  try {
+    katex.render(latex, el, { ...KATEX, displayMode: false, macros: { ...MACROS } });
+  } catch (e) {
+    el.textContent = latex;
+  }
+  return el;
 }
 
 // Where the open note is clipped, or a button to clip it into the selected folder.
