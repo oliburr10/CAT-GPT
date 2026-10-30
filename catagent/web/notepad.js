@@ -370,6 +370,7 @@ function renderNotes() {
     exam,
   ].filter(Boolean));
   requestAnimationFrame(fitFigures);
+  if (document.fonts) document.fonts.ready.then(() => requestAnimationFrame(fitFigures));   // KaTeX's fonts change widths
 }
 
 // Scroll to a method's card and let it light up for a moment.
@@ -383,16 +384,23 @@ function jumpTo(id) {
 }
 
 // A figure beside its derivation can be wider than its column (a matrix product, say). If it would
-// have to shrink below 80%, it moves under the derivation instead; whatever is still too wide
-// shrinks to fit, down to 60%, and only then scrolls.
+// have to shrink below 80%, or the derivation beside it no longer fits, it moves under the
+// derivation instead; whatever is still too wide shrinks to fit, down to 60%, and only then scrolls.
+// Methods sit two to a row; one formula too wide for its card puts them one to a row.
 function fitFigures() {
+  const overflows = (el) => el.scrollWidth > el.clientWidth + 1;
   for (const el of document.querySelectorAll(".figure-math")) {
     const board = el.closest(".board");
     board.classList.remove("stacked");
-    if (fit(el) < 0.8 && getComputedStyle(board).gridTemplateColumns.split(" ").length > 1) {
+    const crowded = fit(el) < 0.8 || [...board.querySelectorAll(".derivation .display, .derivation .expansion")].some(overflows);
+    if (crowded && getComputedStyle(board).gridTemplateColumns.split(" ").length > 1) {
       board.classList.add("stacked");
       fit(el);
     }
+  }
+  for (const grid of document.querySelectorAll(".methods")) {
+    grid.classList.remove("single");
+    if ([...grid.querySelectorAll(".method-formula")].some(overflows)) grid.classList.add("single");
   }
 }
 
@@ -400,8 +408,12 @@ function fit(el) {
   el.style.fontSize = "";
   const base = parseFloat(getComputedStyle(el).fontSize);
   const pad = 32;   // its left and right padding
-  const scale = Math.min(1, (el.clientWidth - pad) / (el.scrollWidth - pad));
-  if (scale < 1) el.style.fontSize = Math.max(0.6, scale) * base + "px";
+  let scale = 1;
+  // Not everything in a formula scales with the font (rules, padding), so measure again.
+  for (let k = 0; k < 4 && el.scrollWidth > el.clientWidth + 1 && scale > 0.6; k++) {
+    scale *= (el.clientWidth - pad) / (el.scrollWidth - pad);
+    el.style.fontSize = Math.max(0.6, scale) * base + "px";
+  }
   return scale;
 }
 window.addEventListener("resize", () => requestAnimationFrame(fitFigures));

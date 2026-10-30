@@ -105,6 +105,7 @@ svg { fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; 
 /* every tool, explained before it is used */
 .methods { display: grid; grid-template-columns: minmax(0, 1fr); gap: 14px; }
 @container (min-width: 860px) { .methods { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); } }
+.methods.single { grid-template-columns: minmax(0, 1fr); }
 .method { min-width: 0; display: flex; flex-direction: column; gap: 6px; padding: 16px 20px 18px; border-radius: 16px; border: 1px solid var(--line-2); scroll-margin: 80px; }
 .method-head { display: flex; align-items: baseline; gap: 10px; }
 .method-head h3 { font-size: 19px; }
@@ -175,6 +176,15 @@ svg { fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; 
 .mol-legend { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 14px; color: var(--ink-2); }
 .mol-key { display: inline-flex; align-items: center; gap: 6px; }
 .mol-key i { width: 10px; height: 10px; border-radius: 3px; display: inline-block; }
+.mc-panels { display: flex; flex-wrap: wrap; gap: 14px 28px; justify-content: center; }
+.mc-panel { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.mc-canvas { display: block; width: 260px; max-width: 100%; height: auto; border-radius: 6px; image-rendering: pixelated; }
+.mc-title { margin: 0; font-size: 15px; color: var(--ink-2); display: flex; align-items: center; gap: 8px; }
+.mc-title i { width: 14px; height: 3px; border-radius: 2px; display: inline-block; }
+.mc-stat { margin: 0; font-size: 14px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.mc-chart-wrap { display: flex; flex-direction: column; gap: 4px; }
+.mc-chart { width: 100%; height: auto; display: block; stroke: none; stroke-width: 1; }
+.mc-axis { font-family: var(--tex); font-size: 13px; fill: var(--muted); }
 
 .checks { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
 .checks li { display: flex; gap: 10px; align-items: baseline; }

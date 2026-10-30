@@ -80,3 +80,12 @@ def test_tex_export_writes_figures_as_text():
     tex = study.to_tex(examples.RIBO_NOTES)
     assert r"\texttt{" + examples._RIBO_OFF + "}" in tex
     assert r"PDB \texttt{4FEO}" in tex
+
+
+def test_sampler_specs():
+    assert figures.problems({"type": "sampler", "model": "ising", "size": 24, "theta": 0.3}, "f") == []
+    found = figures.problems({"type": "sampler", "model": "potts", "size": 100, "theta": 0}, "f")
+    assert found == ["f.model must be ising.", "f.size must be a whole number from 8 to 40.",
+                     "f.theta must be a number with 0 < theta <= 1."]
+    assert figures.problems({"type": "chart"}, "f") == ["f.type must be rna, molecule or sampler."]
+    assert r"$24 \times 24$ lattice" in study.to_tex(examples.PAPER_NOTES)

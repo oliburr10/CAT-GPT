@@ -172,8 +172,15 @@ Notepad draws on the spot, so it's instant and you can play with it:
   holding its ligand) and which residues to colour. The Notepad downloads it from RCSB and shows
   it with [3Dmol.js](https://3dmol.org): drag to turn it, jump to the binding pocket, or let it
   spin. This needs an internet connection the first time.
+- **MCMC samplers.** For Markov chain Monte Carlo, Gibbs sampling, Metropolis–Hastings or the
+  Ising model, the Notepad runs two chains live on an Ising lattice: Gibbs, one random site at a
+  time, and Gibbs-With-Gradients, whose proposal is drawn as a heat map. A chart shows how fast
+  each one settles.
 
-Try them without a model: `python -m catagent.notepad ribo` (or `roll`, `purity`, `trace`).
+Papers work the same way: ask Ginger to explain one and the methods list every formula the paper
+uses, before the solution walks through its argument.
+
+Try them without a model: `python -m catagent.notepad ribo` (or `paper`, `roll`, `purity`, `trace`).
 
 There are no quizzes. Ask about any part in the chat box at the bottom ("explain the speed at
 the edge again") and the cat answers there or rewrites the notes. **Export .tex** saves them as a

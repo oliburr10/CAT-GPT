@@ -9,6 +9,9 @@ The model never draws. It writes a small spec, this module checks it, and the No
             or G-U. If ViennaRNA is installed, each fold also gets its free energy.
   molecule  A 3D structure from the Protein Data Bank by its ID, with highlighted residues and
             a ligand, shown with 3Dmol.js. The page downloads the file from RCSB.
+  sampler   An Ising model on a small lattice, sampled live by two Markov chains side by side:
+            Gibbs (one random site at a time) and Gibbs-With-Gradients (a gradient-informed
+            proposal, drawn as a heat map). For MCMC, Metropolis-Hastings and Ising models.
 """
 
 import re
@@ -30,9 +33,9 @@ _REGION = {
 
 SCHEMA = {
     "type": "object",
-    "description": "Optional figure the Notepad draws itself (instead of picture): an RNA fold or a 3D molecule.",
+    "description": "Optional figure the Notepad draws itself (instead of picture): an RNA fold, a 3D molecule or a live MCMC sampler.",
     "properties": {
-        "type": {"type": "string", "enum": ["rna", "molecule"]},
+        "type": {"type": "string", "enum": ["rna", "molecule", "sampler"]},
         # rna
         "sequence": {"type": "string", "description": "rna: the sequence, A C G U only, 5' to 3'."},
         "states": {
@@ -76,6 +79,10 @@ SCHEMA = {
                 "required": ["residues", "color", "label"],
             },
         },
+        # sampler
+        "model": {"type": "string", "enum": ["ising"], "description": "sampler: the model sampled."},
+        "size": {"type": "integer", "description": "sampler: the lattice is size x size, 8 to 40."},
+        "theta": {"type": "number", "description": "sampler: coupling strength, 0 < theta <= 1; about 0.3 shows domains forming."},
     },
     "required": ["type"],
 }
@@ -108,7 +115,9 @@ def problems(fig, where: str) -> list[str]:
         return _rna_problems(fig, where)
     if kind == "molecule":
         return _molecule_problems(fig, where)
-    return [f"{where}.type must be rna or molecule."]
+    if kind == "sampler":
+        return _sampler_problems(fig, where)
+    return [f"{where}.type must be rna, molecule or sampler."]
 
 
 def _rna_problems(fig, where):
@@ -176,6 +185,19 @@ def _molecule_problems(fig, where):
     lig = fig.get("ligand")
     if lig is not None and not (isinstance(lig, dict) and re.fullmatch(r"[A-Z0-9]{1,3}", str(lig.get("resn", "")))):
         found.append(f"{where}.ligand.resn must be the ligand's residue name in the PDB file, 1 to 3 capitals, e.g. ADE.")
+    return found
+
+
+def _sampler_problems(fig, where):
+    found = []
+    if fig.get("model", "ising") != "ising":
+        found.append(f"{where}.model must be ising.")
+    size = fig.get("size")
+    if not (isinstance(size, int) and not isinstance(size, bool) and 8 <= size <= 40):
+        found.append(f"{where}.size must be a whole number from 8 to 40.")
+    theta = fig.get("theta")
+    if not (isinstance(theta, (int, float)) and not isinstance(theta, bool) and 0 < theta <= 1):
+        found.append(f"{where}.theta must be a number with 0 < theta <= 1.")
     return found
 
 

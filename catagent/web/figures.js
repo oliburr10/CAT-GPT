@@ -1,6 +1,7 @@
 // Figures the Notepad draws itself from a small spec (see figures.py for what the specs mean).
 //   rna       a sequence and its folds: laid out here, morphing from one fold to the next
 //   molecule  a 3D structure from the Protein Data Bank, shown with 3Dmol.js
+//   sampler   an Ising lattice sampled live by Gibbs and by Gibbs-With-Gradients, side by side
 // Figures.render(element, spec, { colors }) fills `element`; colors maps names to hex (no "#").
 
 "use strict";
@@ -407,10 +408,206 @@ window.Figures = (() => {
     }
   }
 
+  // ==== MCMC samplers =========================================================================
+
+  // An Ising model on a cyclic n x n lattice, f(x) = theta s^T J s with spins s = 2x - 1, sampled
+  // live by two chains from the same start: random-scan Gibbs, and Gibbs-With-Gradients, whose
+  // proposal q(i|x) = Softmax(d(x)/2) with d(x) = -(2x - 1) * grad f(x) is drawn as a heat map.
+  function renderSampler(root, spec, opts) {
+    const colors = opts.colors || {};
+    const PROPOSAL = "#" + (colors.green || "1E8A50");
+    const GWG = "#" + (colors.blue || "2F6FDB");
+    const REJECT = "#" + (colors.red || "C23B32");
+    const GIBBS = "#8E8E93";
+    const n = spec.size, D = n * n, theta = spec.theta;
+    const nbrs = Array.from({ length: D }, (_, i) => {
+      const r = Math.floor(i / n), c = i % n;
+      return [((r + n - 1) % n) * n + c, ((r + 1) % n) * n + c, r * n + (c + n - 1) % n, r * n + (c + 1) % n];
+    });
+    const field = (x, i) => nbrs[i].reduce((a, j) => a + 2 * x[j] - 1, 0);              // (Js)_i
+    const delta = (x, i) => -4 * theta * (2 * x[i] - 1) * field(x, i);                   // f(x with i flipped) - f(x)
+    const agree = (x) => { let a = 0; for (let i = 0; i < D; i++) a += (x[i] === x[nbrs[i][1]]) + (x[i] === x[nbrs[i][3]]); return a / (2 * D); };
+
+    // A small seeded generator, so Reset replays the same start.
+    let seed = 7;
+    const rand = () => { seed = (seed * 1664525 + 1013904223) >>> 0; return seed / 4294967296; };
+
+    // d(x) from one gradient: grad_x f = 4 theta J s, so d_i = -(2x_i - 1) 4 theta (Js)_i.
+    // (For this model the first-order estimate equals the true difference.)
+    function proposal(x) {
+      const logits = new Float64Array(D);
+      let top = -Infinity;
+      for (let i = 0; i < D; i++) { logits[i] = delta(x, i) / 2; top = Math.max(top, logits[i]); }
+      const q = new Float64Array(D);
+      let sum = 0;
+      for (let i = 0; i < D; i++) { q[i] = Math.exp(logits[i] - top); sum += q[i]; }
+      for (let i = 0; i < D; i++) q[i] /= sum;
+      return q;
+    }
+
+    const chains = {};
+    function reset() {
+      seed = 7;
+      const start = Uint8Array.from({ length: D }, () => (rand() < 0.5 ? 1 : 0));
+      chains.gibbs = { x: start.slice(), steps: 0, moved: 0, last: -1, ok: true, trace: [agree(start)] };
+      chains.gwg = { x: start.slice(), steps: 0, moved: 0, last: -1, ok: true, trace: [agree(start)], q: proposal(start), lastQ: 0 };
+    }
+
+    function stepGibbs(ch) {
+      const i = Math.floor(rand() * D);
+      const d1 = ch.x[i] ? -delta(ch.x, i) : delta(ch.x, i);                              // f(x_i = 1) - f(x_i = 0)
+      const v = rand() < 1 / (1 + Math.exp(-d1)) ? 1 : 0;
+      ch.ok = v !== ch.x[i];
+      if (ch.ok) ch.moved += 1;
+      ch.x[i] = v;
+      ch.last = i;
+      ch.steps += 1;
+    }
+
+    function stepGWG(ch) {
+      let u = rand(), i = 0;
+      while (i < D - 1 && (u -= ch.q[i]) > 0) i += 1;
+      const forward = ch.q[i], gain = delta(ch.x, i);
+      ch.x[i] ^= 1;
+      const back = proposal(ch.x);
+      ch.ok = rand() < Math.min(1, Math.exp(gain) * back[i] / forward);
+      if (ch.ok) { ch.moved += 1; ch.q = back; } else ch.x[i] ^= 1;
+      ch.last = i;
+      ch.lastQ = forward;
+      ch.steps += 1;
+    }
+
+    // drawing
+    const px = Math.max(4, Math.floor(260 / n));
+    const lattice = (label) => {
+      const canvas = el("canvas", { class: "mc-canvas", width: n * px, height: n * px, "aria-label": label });
+      return { canvas, ctx: canvas.getContext("2d") };
+    };
+    const left = lattice("Gibbs chain"), right = lattice("Gibbs-With-Gradients chain");
+    let showMap = true;
+
+    function paint(view, ch, map) {
+      const { ctx } = view;
+      ctx.clearRect(0, 0, n * px, n * px);
+      let top = 0;
+      if (map) for (let i = 0; i < D; i++) top = Math.max(top, map[i]);
+      for (let i = 0; i < D; i++) {
+        const r = Math.floor(i / n), c = i % n;
+        ctx.fillStyle = ch.x[i] ? INK : "#F2F2F4";
+        ctx.fillRect(c * px, r * px, px, px);
+        if (map && map[i] > top * 0.02) {
+          ctx.globalAlpha = 0.85 * Math.sqrt(map[i] / top);
+          ctx.fillStyle = PROPOSAL;
+          ctx.fillRect(c * px + 1, r * px + 1, px - 2, px - 2);
+          ctx.globalAlpha = 1;
+        }
+      }
+      if (ch.last >= 0) {
+        const r = Math.floor(ch.last / n), c = ch.last % n;
+        ctx.strokeStyle = ch.ok ? "#C9760F" : REJECT;
+        ctx.lineWidth = 2;
+        ctx.strokeRect(c * px - 2, r * px - 2, px + 4, px + 4);
+      }
+    }
+
+    const W = 900, H = 130, MAXSTEPS = Math.max(4000, 12 * D);
+    const chart = svg("svg", { class: "mc-chart", viewBox: `0 0 ${W} ${H + 22}`, role: "img",
+                               "aria-label": "Neighbours that agree, over the steps of each chain" });
+    const yOf = (v) => H - (v - 0.5) / 0.5 * (H - 8);
+    for (const v of [0.5, 0.75, 1]) {
+      chart.append(svg("line", { x1: 34, x2: W, y1: yOf(v), y2: yOf(v), stroke: LINE, "stroke-width": 1 }));
+      const t = svg("text", { x: 28, y: yOf(v) + 4, "text-anchor": "end", class: "mc-axis" });
+      t.textContent = Math.round(v * 100) + "%";
+      chart.append(t);
+    }
+    const xLabel = svg("text", { x: W, y: H + 18, "text-anchor": "end", class: "mc-axis" });
+    xLabel.textContent = "steps →  " + MAXSTEPS.toLocaleString("en-US");
+    const lines = { gibbs: svg("polyline", { stroke: GIBBS, "stroke-width": 2, fill: "none" }),
+                    gwg: svg("polyline", { stroke: GWG, "stroke-width": 2, fill: "none" }) };
+    chart.append(xLabel, lines.gibbs, lines.gwg);
+    const EVERY = Math.max(1, Math.round(MAXSTEPS / 260));
+    const plot = (key) => {
+      const tr = chains[key].trace;
+      lines[key].setAttribute("points", tr.map((v, k) => `${34 + (k * EVERY / MAXSTEPS) * (W - 34)},${yOf(v)}`).join(" "));
+    };
+
+    const stat = () => el("p", { class: "mc-stat" });
+    const stats = { gibbs: stat(), gwg: stat() };
+    const info = el("p", { class: "fig-note" });
+    const pct = (a, b) => (b ? Math.round(100 * a / b) : 0) + "%";
+
+    function draw(detail) {
+      paint(left, chains.gibbs, null);
+      paint(right, chains.gwg, showMap ? chains.gwg.q : null);
+      for (const key of ["gibbs", "gwg"]) {
+        const ch = chains[key];
+        stats[key].textContent = `${ch.steps.toLocaleString("en-US")} steps · x changed in ${pct(ch.moved, ch.steps)} of them`;
+        plot(key);
+      }
+      const g = chains.gwg;
+      if (detail && g.last >= 0) {
+        const r = Math.floor(g.last / n) + 1, c = g.last % n + 1;
+        info.textContent = `Gibbs-With-Gradients proposed the site in row ${r}, column ${c}, with probability ` +
+          `${g.lastQ.toFixed(4)} (a uniform pick would be ${(1 / D).toFixed(4)}), and ${g.ok ? "accepted" : "rejected"} it.`;
+      } else if (!detail) {
+        info.textContent = "Green: where Gibbs-With-Gradients will propose next, q(i | x). Gibbs picks every site equally often.";
+      }
+    }
+
+    let running = false, frame = 0;
+    function advance(k) {
+      for (let s = 0; s < k; s++) {
+        stepGibbs(chains.gibbs);
+        stepGWG(chains.gwg);
+        if (chains.gwg.steps % EVERY === 0) {
+          chains.gibbs.trace.push(agree(chains.gibbs.x));
+          chains.gwg.trace.push(agree(chains.gwg.x));
+        }
+      }
+    }
+    function loop() {
+      advance(Math.max(1, Math.round(D / 60)));
+      draw(false);
+      if (chains.gwg.steps >= MAXSTEPS) setRunning(false);
+      if (running) frame = requestAnimationFrame(loop);
+    }
+    function setRunning(on) {
+      running = on && chains.gwg.steps < MAXSTEPS;
+      run.textContent = running ? "Pause" : "▶ Run";
+      run.setAttribute("aria-pressed", String(running));
+      cancelAnimationFrame(frame);
+      if (running) frame = requestAnimationFrame(loop);
+    }
+
+    const run = el("button", { type: "button", class: "fig-tab", "aria-pressed": "false", onClick: () => setRunning(!running) }, "▶ Run");
+    const one = el("button", { type: "button", class: "fig-tab", onClick: () => { setRunning(false); advance(1); draw(true); } }, "One step");
+    const again = el("button", { type: "button", class: "fig-tab", onClick: () => { setRunning(false); reset(); draw(false); } }, "Reset");
+    const mapBtn = el("button", { type: "button", class: "fig-tab", "aria-pressed": "true", onClick: () => {
+      showMap = !showMap;
+      mapBtn.setAttribute("aria-pressed", String(showMap));
+      draw(false);
+    } }, "Proposal map");
+
+    const panel = (title, color, view, key) => el("div", { class: "mc-panel" },
+      el("p", { class: "mc-title" }, el("i", { style: "background:" + color }), title), view.canvas, stats[key]);
+    root.classList.add("fig", "fig-sampler");
+    root.append(
+      el("div", { class: "fig-tabs" }, run, one, again, mapBtn,
+         el("span", { class: "fig-hint", text: `Ising model · ${n}×${n} lattice · θ = ${theta}` })),
+      el("div", { class: "mc-panels" }, panel("Gibbs, one random site", GIBBS, left, "gibbs"),
+         panel("Gibbs-With-Gradients", GWG, right, "gwg")),
+      el("div", { class: "mc-chart-wrap" }, el("p", { class: "mc-title" }, "Neighbours that agree"), chart),
+      el("div", { class: "fig-caption-row" }, info));
+    reset();
+    draw(false);
+    if (!REDUCED) whenSeen(root, () => setRunning(true));
+  }
+
   function render(root, spec, opts) {
     try {
       if (spec.type === "rna") renderRNA(root, spec, opts || {});
       else if (spec.type === "molecule") renderMolecule(root, spec, opts || {});
+      else if (spec.type === "sampler") renderSampler(root, spec, opts || {});
     } catch (e) {
       root.textContent = "This figure couldn't be drawn: " + e.message;
     }

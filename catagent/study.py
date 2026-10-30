@@ -169,6 +169,9 @@ its pocket. The Notepad animates between the folds. Pairs must be A-U, G-C or G-
 model sequence if you don't know a real one, and say so in the caption.
   - figure type molecule, for a real 3D structure: a PDB ID you are certain of, residues to \
 highlight with labels, and the ligand's residue name. Never guess a PDB ID.
+  - figure type sampler, for MCMC, Metropolis-Hastings, Gibbs sampling or the Ising model: \
+model ising, the lattice size (8 to 40) and the coupling theta (about 0.3 shows domains). The \
+Notepad runs Gibbs and Gibbs-With-Gradients side by side, live, with the proposal as a heat map.
 - checks: quick ways to see the answer is right: units, a limit or special case, a number.
 - takeaways: the key idea in one sentence, and the common mistakes with how to avoid them.
 - exam: the clean solution as {user} would hand it in, in a few numbered lines.
@@ -541,4 +544,7 @@ def _figure_tex(fig: dict) -> str:
             energy = rf" ($\Delta G = {st['energy']}$ kcal/mol)" if "energy" in st else ""
             rows.append(rf"\texttt{{{st['structure']}}}\quad {_tex_text(st['name'])}{energy}")
         return r"{\footnotesize " + r"\\ ".join(rows) + "}"
+    if fig.get("type") == "sampler":
+        return (rf"Ising model on a ${fig['size']} \times {fig['size']}$ lattice, $\theta = {fig['theta']}$, sampled by "
+                r"Gibbs and by Gibbs-With-Gradients. Open the notes in the Notepad to watch the chains run.")
     return rf"3D structure: PDB \texttt{{{fig['pdb']}}}. Open the notes in the Notepad to turn it around."
